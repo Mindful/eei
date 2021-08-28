@@ -102,7 +102,7 @@ ibus_eei_engine_destroy (IBusEEIEngine *eei)
 static void
 ibus_eei_engine_update_lookup_table (IBusEEIEngine *eei)
 {
-    gchar ** sugs;
+    gchar* sugs[] = {"foo", "bar"};
     gint n_sug, i;
     gboolean retval;
 
@@ -112,23 +112,19 @@ ibus_eei_engine_update_lookup_table (IBusEEIEngine *eei)
     }
 
     ibus_lookup_table_clear (eei->table);
-    
-//    sugs = eei_dict_suggest (dict,
-//                                 eei->preedit->str,
-//                                 eei->preedit->len,
-//                                 &n_sug);
-//
-//    if (sugs == NULL || n_sug == 0) {
-//        ibus_engine_hide_lookup_table ((IBusEngine *) eei);
-//        return;
-//    }
-//
-//    for (i = 0; i < n_sug; i++) {
-//        ibus_lookup_table_append_candidate (eei->table, ibus_text_new_from_string (sugs[i]));
-//    }
-//
-//    ibus_engine_update_lookup_table ((IBusEngine *) eei, eei->table, TRUE);
-//
+    n_sug = 2;
+
+    if (n_sug == 0) {
+        ibus_engine_hide_lookup_table ((IBusEngine *) eei);
+        return;
+    }
+
+    for (i = 0; i < n_sug; i++) {
+        ibus_lookup_table_append_candidate (eei->table, ibus_text_new_from_string (sugs[i]));
+    }
+
+    ibus_engine_update_lookup_table ((IBusEngine *) eei, eei->table, TRUE);
+
 //    if (sugs)
 //        eei_dict_free_suggestions (dict, sugs);
 }
@@ -145,18 +141,18 @@ ibus_eei_engine_update_preedit (IBusEEIEngine *eei)
     ibus_attr_list_append (text->attrs,
                            ibus_attr_underline_new (IBUS_ATTR_UNDERLINE_SINGLE, 0, eei->preedit->len));
 
-//    if (eei->preedit->len > 0) {
-//        retval = eei_dict_check (dict, eei->preedit->str, eei->preedit->len);
-//        if (retval != 0) {
-//            ibus_attr_list_append (text->attrs,
-//                               ibus_attr_foreground_new (0xff0000, 0, eei->preedit->len));
-//        }
-//    }
-//
-//    ibus_engine_update_preedit_text ((IBusEngine *)eei,
-//                                     text,
-//                                     eei->cursor_pos,
-//                                     TRUE);
+    if (eei->preedit->len > 0) {
+        retval = 2;
+        if (retval != 0) {
+            ibus_attr_list_append (text->attrs,
+                               ibus_attr_foreground_new (0xff0000, 0, eei->preedit->len));
+        }
+    }
+
+    ibus_engine_update_preedit_text ((IBusEngine *)eei,
+                                     text,
+                                     eei->cursor_pos,
+                                     TRUE);
 
 }
 

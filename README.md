@@ -6,3 +6,5 @@ and https://github.com/phuang/ibus-tmpl.
 ibus restart
 ibus engine eei
 ```
+
+press ctrl+s while typing to open the lookup table (currently)
