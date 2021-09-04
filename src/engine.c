@@ -1,4 +1,7 @@
 #include "engine.h"
+#include <stdio.h>
+#include "predict.h"
+
 
 typedef struct _IBusEEIEngine IBusEEIEngine;
 typedef struct _IBusEEIEngineClass IBusEEIEngineClass;
@@ -62,6 +65,17 @@ static void ibus_eei_engine_update      (IBusEEIEngine      *eei);
 
 G_DEFINE_TYPE (IBusEEIEngine, ibus_eei_engine, IBUS_TYPE_ENGINE)
 
+static void debug_print(char* text) {
+    printf("%s\n", text);
+    fflush(stdout);
+}
+
+static gboolean can_get_surrounding_text(IBusEEIEngine *eei)
+{
+    return eei->parent.client_capabilities & IBUS_CAP_SURROUNDING_TEXT;
+}
+
+
 static void
 ibus_eei_engine_class_init (IBusEEIEngineClass *klass)
 {
@@ -71,6 +85,7 @@ ibus_eei_engine_class_init (IBusEEIEngineClass *klass)
 	ibus_object_class->destroy = (IBusObjectDestroyFunc) ibus_eei_engine_destroy;
 
     engine_class->process_key_event = ibus_eei_engine_process_key_event;
+    engine_class->enable = ibus_eei_engine_enable;
 }
 
 static void
@@ -97,6 +112,14 @@ ibus_eei_engine_destroy (IBusEEIEngine *eei)
     }
 
 	((IBusObjectClass *) ibus_eei_engine_parent_class)->destroy ((IBusObject *)eei);
+}
+
+static void
+ibus_eei_engine_enable  (IBusEngine *engine)
+{
+    debug_print("enable get surrounding text");
+    // dummy call to tell the input context that the engine will utilize surrounding-text
+    ibus_engine_get_surrounding_text (engine, NULL, NULL, NULL);
 }
 
 static void
@@ -200,12 +223,12 @@ ibus_eei_engine_process_key_event (IBusEngine *engine,
     IBusText *text;
     IBusEEIEngine *eei = (IBusEEIEngine *)engine;
 
-    if (modifiers & IBUS_RELEASE_MASK)
+    if (modifiers & IBUS_RELEASE_MASK) //if it's a key release
         return FALSE;
 
     modifiers &= (IBUS_CONTROL_MASK | IBUS_MOD1_MASK);
 
-    if (modifiers == IBUS_CONTROL_MASK && keyval == IBUS_s) {
+    if (modifiers == IBUS_CONTROL_MASK && keyval == IBUS_s) { //update lookup table if CTRL S
         ibus_eei_engine_update_lookup_table (eei);
         return TRUE;
     }
@@ -253,24 +276,45 @@ ibus_eei_engine_process_key_event (IBusEngine *engine,
         return TRUE;
     
     case IBUS_Up:
+        debug_print("got up");
+        rust_function();
         if (eei->preedit->len == 0)
             return FALSE;
-        if (eei->cursor_pos != 0) {
-            eei->cursor_pos = 0;
-            ibus_eei_engine_update (eei);
+//        if (eei->cursor_pos != 0) {
+//            eei->cursor_pos = 0;
+//            ibus_eei_engine_update (eei);
+//        }
+
+        if (can_get_surrounding_text(eei)) {
+            //TODO: this check isn't definitive - oftentimes it returns true and we still can't get the surrounding text
+            IBusText* surrounding;
+            guint     cursor_pos;
+            guint     anchor_pos;
+            ibus_engine_get_surrounding_text(&(eei->parent), &surrounding, &cursor_pos, &anchor_pos);
+            printf("surrounding text %s, cursor_pos %i, anchor_pos %i\n",
+                   ibus_text_get_text(surrounding), cursor_pos, anchor_pos);
+            fflush(stdout);
+        } else {
+            debug_print("can't get surrounding text");
         }
+
+        ibus_lookup_table_cursor_up(eei->table);
+            ibus_engine_update_lookup_table ((IBusEngine *) eei, eei->table, TRUE);
         return TRUE;
 
     case IBUS_Down:
+        debug_print("got down");
         if (eei->preedit->len == 0)
             return FALSE;
-        
-        if (eei->cursor_pos != eei->preedit->len) {
-            eei->cursor_pos = eei->preedit->len;
-            ibus_eei_engine_update (eei);
-        }
-        
-        return TRUE;
+
+//        if (eei->cursor_pos != eei->preedit->len) {
+//            eei->cursor_pos = eei->preedit->len;
+//            ibus_eei_engine_update (eei);
+//        }
+            ibus_lookup_table_cursor_down(eei->table);
+            ibus_engine_update_lookup_table ((IBusEngine *) eei, eei->table, TRUE);
+
+            return TRUE;
     
     case IBUS_BackSpace:
         if (eei->preedit->len == 0)

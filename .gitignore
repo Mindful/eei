@@ -6,6 +6,7 @@ autom4te.cache/
 .deps/
 stamp-*
 *.xml
+src/predict/target
 
 CMakeFiles/
 *.cbp
