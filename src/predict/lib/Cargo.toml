@@ -1,0 +1,10 @@
+[package]
+name = "predict"
+version = "0.1.0"
+edition = "2018"
+
+[lib]
+crate-type = ["staticlib"] # Creates static lib
+
+[dependencies]
+fst = "0.4.7"
