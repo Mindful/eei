@@ -8,6 +8,11 @@ stamp-*
 *.xml
 src/predict/target
 
+dictionary.fst
+hunspell_US.txt
+shortcodes.fst
+symbols.bin
+
 CMakeFiles/
 *.cbp
 cmake_install.cmake
