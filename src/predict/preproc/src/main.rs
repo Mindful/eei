@@ -48,16 +48,15 @@ fn write_symbols_and_shortcodes(data: &Vec<(String, String)>) -> Result<(), Box<
 
 
     let mut shortcodes_symbols = data.clone();
-    shortcodes_symbols.sort_by_key(|(shortcode, symbol)| shortcode.clone());
+    shortcodes_symbols.sort_by_key(|(shortcode, _symbol)| shortcode.clone());
     let mut counter: u64 = 0;
-    let symbol_insertions: Result<Vec<String>, _> = shortcodes_symbols.into_iter()
+    let symbols: Vec<String> = shortcodes_symbols.into_iter()
         .map(|(shortcode, content)| {
             build.insert(shortcode, counter).map(|_| {
                 counter += 1;
                 content.clone()
             })
-    }).collect();
-    let symbols = symbol_insertions?;
+    }).collect::<Result<Vec<_>, _>>()?;
     // Finish construction of the map and flush its contents to disk.
     build.finish()?;
 
@@ -67,18 +66,19 @@ fn write_symbols_and_shortcodes(data: &Vec<(String, String)>) -> Result<(), Box<
 }
 
 fn process_dictionary() -> Result<(), Box<dyn error::Error>> {
-    //TODO: gonna have to sort/reorder the dictionary
-
     let writer = io::BufWriter::new(File::create("dictionary.fst")?);
     let mut build = SetBuilder::new(writer)?;
 
+    let mut lines = io::BufReader::new(File::open("hunspell_US.txt")?)
+        .lines()
+        .collect::<Result<Vec<_>, _>>()?;
 
-    for line in io::BufReader::new(File::open("hunspell_US.txt")?).lines() {
-        match line {
-            Ok(line_content) => Ok(build.insert(line_content)?), //convert error type
-            Err(e) => Err(e)
-        }?
+    lines.sort();
+
+    for line in lines {
+        build.insert(line)?;
     }
+
     build.finish()?;
     Ok(())
 }
