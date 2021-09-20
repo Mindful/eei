@@ -7,4 +7,8 @@ edition = "2018"
 crate-type = ["staticlib"] # Creates static lib
 
 [dependencies]
-fst = "0.4.7"
+fst = { version = "0.4.7", features = ["levenshtein"] }
+bincode = "1.3.3"
+lazy_static = "1.4.0"
+
+
