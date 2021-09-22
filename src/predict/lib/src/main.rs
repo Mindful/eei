@@ -1,6 +1,7 @@
 use fst::{Map, Set, IntoStreamer};
 use fst::automaton::{Automaton, Str, Levenshtein};
 use lazy_static::lazy_static;
+use crate::PredictionError::*;
 
 struct Predictor {
     dictionary: Set<Vec<u8>>,
@@ -8,16 +9,29 @@ struct Predictor {
     symbols: Vec<String>
 }
 
-impl Predictor {
-    // fn word(&self, context: &str) {
-    //
-    // }
+#[derive(Debug)]
+enum PredictionError {
+    FstError(fst::Error),
+    LevenshteinError(fst::automaton::LevenshteinError)
+}
 
-    fn symbol(&self, context: &str) -> Result<Vec<(String, &String)>,  fst::Error> {
-        let context_matcher = Str::new(context).starts_with();
-        let search_results  = self.shortcode_dictionary.search(context_matcher)
+
+impl Predictor {
+    fn word(&self, context: &str) -> Result<Vec<String>,  PredictionError>  {
+        let acceptable_edit_distance: u32 = (context.len() as f64).log2().floor() as u32;
+        let matcher = Str::new(context).starts_with()
+            .union(Levenshtein::new(context, acceptable_edit_distance).map_err(LevenshteinError)?);
+
+        Ok(self.dictionary.search(matcher)
             .into_stream()
-            .into_str_vec()?;
+            .into_strs().map_err(FstError)?)
+    }
+
+    fn symbol(&self, context: &str) -> Result<Vec<(String, &String)>,  PredictionError> {
+        let matcher = Str::new(context).starts_with();
+        let search_results  = self.shortcode_dictionary.search(matcher)
+            .into_stream()
+            .into_str_vec().map_err(FstError)?;
 
         //must be into_iter() and not iter() - the latter iterates over references, but we need
         //to take ownership to return the data without clone()
@@ -41,9 +55,16 @@ lazy_static! {
 
 
 fn main() {
+    let word_pref = "lit";
+
     let symbol_results = PREDICTOR.symbol("ang").unwrap();
+    let word_results = PREDICTOR.word(word_pref).unwrap();
     for (shortcode, symbol) in symbol_results {
         println!("{shortcode} : {symbol}", shortcode=shortcode, symbol=symbol);
+    }
+    println!("words for {pref}:", pref=word_pref);
+    for word in word_results {
+        println!("{word}", word=word);
     }
 
 }
