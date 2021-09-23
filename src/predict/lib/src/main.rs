@@ -1,10 +1,10 @@
-use fst::{Map, Set, IntoStreamer};
+use fst::{Map, IntoStreamer};
 use fst::automaton::{Automaton, Str, Levenshtein};
 use lazy_static::lazy_static;
 use crate::PredictionError::*;
 
 struct Predictor {
-    dictionary: Set<Vec<u8>>,
+    dictionary: Map<Vec<u8>>,
     shortcode_dictionary: Map<Vec<u8>>,
     symbols: Vec<String>
 }
@@ -22,9 +22,12 @@ impl Predictor {
         let matcher = Str::new(context).starts_with()
             .union(Levenshtein::new(context, acceptable_edit_distance).map_err(LevenshteinError)?);
 
-        Ok(self.dictionary.search(matcher)
+        let mut search_results = self.dictionary.search(matcher)
             .into_stream()
-            .into_strs().map_err(FstError)?)
+            .into_str_vec().map_err(FstError)?;
+
+        search_results.sort_by(|(_w1, f1), (_w2, f2)| f2.cmp(f1));
+        Ok(search_results.into_iter().map(|(word, _freq)| {word}).take(10).collect())
     }
 
     fn symbol(&self, context: &str) -> Result<Vec<(String, &String)>,  PredictionError> {
@@ -44,7 +47,7 @@ impl Predictor {
 
 lazy_static! {
     static ref PREDICTOR: Predictor = Predictor {
-        dictionary: Set::new(include_bytes!("../../dictionary.fst").to_vec()).unwrap(),
+        dictionary: Map::new(include_bytes!("../../dictionary.fst").to_vec()).unwrap(),
         shortcode_dictionary: Map::new(include_bytes!("../../shortcodes.fst").to_vec()).unwrap(),
         symbols: bincode::deserialize(include_bytes!("../../symbols.bin")).unwrap()
     };
