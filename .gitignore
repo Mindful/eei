@@ -12,6 +12,7 @@ dictionary.fst
 hunspell_US.txt
 shortcodes.fst
 symbols.bin
+count_1w.txt
 
 CMakeFiles/
 *.cbp

@@ -1,28 +1,40 @@
 use std::collections::{HashMap, HashSet};
-use fst::{MapBuilder, SetBuilder};
+use fst::MapBuilder;
 use std::num::ParseIntError;
 use std::fs::File;
 use std::io;
 use std::error;
 use std::io::{Write, BufRead};
+use crate::ParseError::*;
+use std::fmt::{Display, Formatter};
+
 
 #[derive(Debug, Clone)]
 enum ParseError {
     InvalidJson(String),
     InvalidHex(ParseIntError),
-    InvalidCodepoint(u32)
+    InvalidCodepoint(u32),
+    InvalidWordFreq(String)
 }
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl error::Error for ParseError {}
 
 //https://stackoverflow.com/questions/69152223/unicode-codepoint-to-rust-string
 fn parse_unicode(input: &str) -> Result<char, ParseError> {
-    let unicode = u32::from_str_radix(input, 16).map_err(ParseError::InvalidHex)?;
-    char::from_u32(unicode).ok_or_else(|| ParseError::InvalidCodepoint(unicode))
+    let unicode = u32::from_str_radix(input, 16).map_err(InvalidHex)?;
+    char::from_u32(unicode).ok_or_else(|| InvalidCodepoint(unicode))
 }
 
 fn parse_github_emoji_url(url: &String) -> Result<String, ParseError> {
     let bytecode_strings = url.split('/')
-        .last().ok_or(ParseError::InvalidJson(url.clone()))?
-        .split('.').next().ok_or(ParseError::InvalidJson(url.clone()))?.split('-');
+        .last().ok_or(InvalidJson(url.clone()))?
+        .split('.').next().ok_or(InvalidJson(url.clone()))?.split('-');
 
     bytecode_strings.map(|codepoint| parse_unicode(codepoint))
     .collect::<Result<Vec<_>, _>>().map(|char_vec|char_vec.into_iter().collect::<String>())
@@ -74,9 +86,29 @@ fn write_symbols_and_shortcodes(mut shortcodes_symbols: Vec<(String, String)>) -
     Ok(())
 }
 
+fn load_word_freq_data() -> Result<HashMap<String, u64>, Box<dyn error::Error>> {
+    let lines = io::BufReader::new(File::open("count_1w.txt")?)
+        .lines()
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(lines.into_iter().filter_map(|line| {
+        if line.len() == 0 {
+            None
+        }
+        else {
+            let mut split_line = line.split("\t");
+            Some(split_line.next().ok_or(InvalidWordFreq(line.clone())).and_then(|word| {
+                split_line.last().ok_or(InvalidWordFreq(line.clone()))
+                    .and_then(|x| x.parse::<u64>().map_err(|_| {InvalidWordFreq(line.clone())}))
+                    .map(|count| (word.to_string(), count))
+            }))
+        }
+    }).collect::<Result<HashMap<String, u64>, ParseError>>()?)
+}
+
 fn process_dictionary() -> Result<(), Box<dyn error::Error>> {
     let writer = io::BufWriter::new(File::create("dictionary.fst")?);
-    let mut set_builder = SetBuilder::new(writer)?;
+    let mut map_builder = MapBuilder::new(writer)?;
 
     let mut lines = io::BufReader::new(File::open("hunspell_US.txt")?)
         .lines()
@@ -84,13 +116,25 @@ fn process_dictionary() -> Result<(), Box<dyn error::Error>> {
 
     //must be in lexographical order to build the FST
     lines.sort();
+    lines.dedup();
+    let word_freq = load_word_freq_data()?;
+
+    let mut words_without_freq = 0;
 
     for line in lines.iter() {
-        set_builder.insert(line)?;
+        map_builder.insert(line,
+                           *word_freq.get(line.to_lowercase().as_str()).unwrap_or_else(|| {
+                                                words_without_freq += 1;
+                                                &0
+                                            }))?;
     }
 
-    set_builder.finish()?;
-    println!("Wrote {entries} dictionary entries", entries=lines.len());
+    let words_with_freq = lines.len() - words_without_freq;
+
+    map_builder.finish()?;
+    println!("Wrote {entries} dictionary entries, of which {with_freq} had frequency ({perc:.2}%)",
+             entries=lines.len(), with_freq=words_with_freq,
+             perc=(words_with_freq as f64 / lines.len() as f64));
     Ok(())
 }
 

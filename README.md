@@ -16,3 +16,8 @@ sudo apt-get install hunspell-tools
 unzip hunspell-en_US-2020.12.07.zip
 unmunch en_US.dic en_US.aff > hunspell_US.txt
 ```
+
+## Word frequency data
+```shell
+wget https://norvig.com/ngrams/count_1w.txt
+```
