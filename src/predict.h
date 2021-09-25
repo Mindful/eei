@@ -8,6 +8,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-void rust_function(void);
+typedef struct WordPredictions {
+  int len;
+  char **words;
+} WordPredictions;
+
+struct WordPredictions *rust_function(void);
+
+struct WordPredictions *get_word_predictions(char *characters);
 
 #endif /* predict_rs */

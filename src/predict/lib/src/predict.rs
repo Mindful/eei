@@ -12,7 +12,8 @@ pub struct Predictor {
 #[derive(Debug)]
 pub enum PredictionError {
     FstError(fst::Error),
-    LevenshteinError(fst::automaton::LevenshteinError)
+    LevenshteinError(fst::automaton::LevenshteinError),
+    MissingSymbol(String, u64)
 }
 
 
@@ -28,17 +29,20 @@ impl Predictor {
         Ok(search_results.into_iter().map(|(word, _freq)| {word}).take(10).collect())
     }
 
-    pub fn symbol(&self, context: &str) -> Result<Vec<(String, &String)>,  PredictionError> {
+    pub fn symbol(&self, context: &str) -> Result<Vec<(String, String)>,  PredictionError> {
         let matcher = Str::new(context).starts_with();
         let search_results  = self.shortcode_dictionary.search(matcher)
             .into_stream()
             .into_str_vec().map_err(FstError)?;
 
         //must be into_iter() and not iter() - the latter iterates over references, but we need
-        //to take ownership to return the data without clone()
+        //to take ownership to return the shortcode data without clone()
         Ok(search_results.into_iter().map(|(shortcode, ident)| {
-            (shortcode, self.symbols.get(ident as usize).unwrap())
-        }).collect())
+            match self.symbols.get(ident as usize) {
+                Some(symbol) => Ok((shortcode, symbol.clone())),
+                None => Err(MissingSymbol(shortcode, ident))
+            }
+        }).collect::<Result<Vec<_>, _>>()?)
     }
 }
 
