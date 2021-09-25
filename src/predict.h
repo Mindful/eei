@@ -13,8 +13,8 @@ typedef struct WordPredictions {
   char **words;
 } WordPredictions;
 
-struct WordPredictions *rust_function(void);
+struct WordPredictions get_word_predictions(char *characters);
 
-struct WordPredictions *get_word_predictions(char *characters);
+void free_word_predictions(struct WordPredictions predictions);
 
 #endif /* predict_rs */

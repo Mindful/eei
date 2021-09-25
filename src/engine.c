@@ -125,9 +125,8 @@ ibus_eei_engine_enable  (IBusEngine *engine)
 static void
 ibus_eei_engine_update_lookup_table (IBusEEIEngine *eei)
 {
-    gchar* sugs[] = {"foo", "bar"};
-    gint n_sug, i;
-    gboolean retval;
+    WordPredictions predictions = get_word_predictions(eei->preedit->str);
+    gint i;
 
     if (eei->preedit->len == 0) {
         ibus_engine_hide_lookup_table ((IBusEngine *) eei);
@@ -135,21 +134,18 @@ ibus_eei_engine_update_lookup_table (IBusEEIEngine *eei)
     }
 
     ibus_lookup_table_clear (eei->table);
-    n_sug = 2;
 
-    if (n_sug == 0) {
+    if (predictions.len == 0) {
         ibus_engine_hide_lookup_table ((IBusEngine *) eei);
         return;
     }
 
-    for (i = 0; i < n_sug; i++) {
-        ibus_lookup_table_append_candidate (eei->table, ibus_text_new_from_string (sugs[i]));
+    for (i = 0; i < predictions.len; i++) {
+        ibus_lookup_table_append_candidate (eei->table, ibus_text_new_from_string (predictions.words[i]));
     }
 
     ibus_engine_update_lookup_table ((IBusEngine *) eei, eei->table, TRUE);
-
-//    if (sugs)
-//        eei_dict_free_suggestions (dict, sugs);
+    free_word_predictions(predictions);
 }
 
 static void
@@ -277,7 +273,6 @@ ibus_eei_engine_process_key_event (IBusEngine *engine,
     
     case IBUS_Up:
         debug_print("got up");
-        rust_function();
         if (eei->preedit->len == 0)
             return FALSE;
 //        if (eei->cursor_pos != 0) {

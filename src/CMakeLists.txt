@@ -14,7 +14,7 @@ add_executable(ibus-engine-eei
         engine.c
 )
 target_link_libraries(ibus-engine-eei
-    ${IBUS_LIBRARIES} ${PREDICT} Threads::Threads dl m # pthreads and dl required by rust
+    ${IBUS_LIBRARIES} ${PREDICT} Threads::Threads dl m # pthreads, dl, m required by rust
 )
 target_include_directories(ibus-engine-eei PUBLIC ${IBUS_INCLUDE_DIRS})
 
