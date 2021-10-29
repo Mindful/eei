@@ -117,7 +117,6 @@ ibus_eei_engine_destroy (IBusEEIEngine *eei)
 static void
 ibus_eei_engine_enable  (IBusEngine *engine)
 {
-    debug_print("enable get surrounding text");
     // dummy call to tell the input context that the engine will utilize surrounding-text
     ibus_engine_get_surrounding_text (engine, NULL, NULL, NULL);
 }
@@ -152,7 +151,6 @@ static void
 ibus_eei_engine_update_preedit (IBusEEIEngine *eei)
 {
     IBusText *text;
-    gint retval;
 
     text = ibus_text_new_from_static_string (eei->preedit->str);
     text->attrs = ibus_attr_list_new ();
@@ -160,13 +158,6 @@ ibus_eei_engine_update_preedit (IBusEEIEngine *eei)
     ibus_attr_list_append (text->attrs,
                            ibus_attr_underline_new (IBUS_ATTR_UNDERLINE_SINGLE, 0, eei->preedit->len));
 
-    if (eei->preedit->len > 0) {
-        retval = 2;
-        if (retval != 0) {
-            ibus_attr_list_append (text->attrs,
-                               ibus_attr_foreground_new (0xff0000, 0, eei->preedit->len));
-        }
-    }
 
     ibus_engine_update_preedit_text ((IBusEngine *)eei,
                                      text,
@@ -275,26 +266,9 @@ ibus_eei_engine_process_key_event (IBusEngine *engine,
         debug_print("got up");
         if (eei->preedit->len == 0)
             return FALSE;
-//        if (eei->cursor_pos != 0) {
-//            eei->cursor_pos = 0;
-//            ibus_eei_engine_update (eei);
-//        }
-
-        if (can_get_surrounding_text(eei)) {
-            //TODO: this check isn't definitive - oftentimes it returns true and we still can't get the surrounding text
-            IBusText* surrounding;
-            guint     cursor_pos;
-            guint     anchor_pos;
-            ibus_engine_get_surrounding_text(&(eei->parent), &surrounding, &cursor_pos, &anchor_pos);
-            printf("surrounding text %s, cursor_pos %i, anchor_pos %i\n",
-                   ibus_text_get_text(surrounding), cursor_pos, anchor_pos);
-            fflush(stdout);
-        } else {
-            debug_print("can't get surrounding text");
-        }
 
         ibus_lookup_table_cursor_up(eei->table);
-            ibus_engine_update_lookup_table ((IBusEngine *) eei, eei->table, TRUE);
+        ibus_engine_update_lookup_table ((IBusEngine *) eei, eei->table, TRUE);
         return TRUE;
 
     case IBUS_Down:
@@ -302,15 +276,12 @@ ibus_eei_engine_process_key_event (IBusEngine *engine,
         if (eei->preedit->len == 0)
             return FALSE;
 
-//        if (eei->cursor_pos != eei->preedit->len) {
-//            eei->cursor_pos = eei->preedit->len;
-//            ibus_eei_engine_update (eei);
-//        }
-            ibus_lookup_table_cursor_down(eei->table);
-            ibus_engine_update_lookup_table ((IBusEngine *) eei, eei->table, TRUE);
 
-            return TRUE;
-    
+        ibus_lookup_table_cursor_down(eei->table);
+        ibus_engine_update_lookup_table ((IBusEngine *) eei, eei->table, TRUE);
+
+        return TRUE;
+
     case IBUS_BackSpace:
         if (eei->preedit->len == 0)
             return FALSE;

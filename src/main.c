@@ -3,6 +3,7 @@
 #include <ibus.h>
 #include <stdio.h>
 #include "engine.h"
+#include "predict.h"
 
 static IBusBus *bus = NULL;
 static IBusFactory *factory = NULL;
@@ -91,7 +92,9 @@ int main(int argc, char **argv)
       return (-1);
     }
 
+    configure_logging();
     debug_print("halfway through main");
+
 
     /* Go */
     init ();

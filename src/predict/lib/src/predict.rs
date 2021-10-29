@@ -29,7 +29,9 @@ impl Predictor {
             .into_str_vec().map_err(FstError)?;
 
         search_results.sort_by(|(_w1, f1), (_w2, f2)| f2.cmp(f1));
-        Ok(search_results.into_iter().map(|(word, _freq)| {word}).take(10).collect())
+        let final_results = search_results.into_iter().map(|(word, _freq)| {word}).take(10).collect();
+        log::info!("Predictions for {}: {:?}", context, final_results);
+        Ok(final_results)
     }
 
     pub fn symbol(&self, context: &str) -> Result<Vec<(String, String)>,  PredictionError> {

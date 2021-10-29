@@ -13,6 +13,8 @@ typedef struct WordPredictions {
   char **words;
 } WordPredictions;
 
+void configure_logging(void);
+
 struct WordPredictions get_word_predictions(char *characters);
 
 void free_word_predictions(struct WordPredictions predictions);
