@@ -13,6 +13,8 @@ typedef struct WordPredictions {
   char **words;
 } WordPredictions;
 
+void rust_info_log(char *characters);
+
 void configure_logging(void);
 
 struct WordPredictions get_word_predictions(char *characters);

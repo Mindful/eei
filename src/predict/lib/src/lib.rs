@@ -1,16 +1,16 @@
 mod predict;
-use std::ffi::CString;
+
+use std::ffi::{CString, CStr};
 use std::os::raw::{c_char, c_int};
 use std::mem;
-use std::io::Write;
 use log::LevelFilter;
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
 use log4rs::config::{Appender, Config, Root};
 
-use predict::PREDICTOR;
 use crate::predict::PredictionError::{FailedStringConversion, FstError, LevenshteinError, MissingSymbol};
 use crate::predict::PredictionError;
+use crate::predict::PREDICTOR;
 
 impl PredictionError {
     fn error_message(&self) -> String {
@@ -37,6 +37,18 @@ pub struct SymbolPredictions {
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn rust_info_log(characters: *mut c_char){
+    CStr::from_ptr(characters)
+        .to_str()
+        .map(|s| {
+            log::info!("log: {}", s);
+            mem::forget(s);
+        }).unwrap_or_else(|_| {
+            log::error!("Logging failed")
+    });
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn configure_logging() {
     let logfile = FileAppender::builder()
         .encoder(Box::new(PatternEncoder::new("{l} - {m}\n")))
@@ -53,11 +65,11 @@ pub unsafe extern "C" fn configure_logging() {
 
 #[no_mangle]
 pub unsafe extern "C" fn get_word_predictions(characters: *mut c_char) -> WordPredictions {
-    CString::from_raw(characters)
-        .into_string()
+    CStr::from_ptr(characters)
+        .to_str()
         .map_err(FailedStringConversion)
         .and_then(|cstring| {
-            PREDICTOR.word(cstring.as_str())
+            PREDICTOR.word(cstring)
         }).map(|word_predictions| {
             WordPredictions {
                 len: word_predictions.len() as c_int,
@@ -89,8 +101,8 @@ fn convert_string_vector(str_vec: Vec<String>) -> *mut *mut c_char {
         let ptr = cstring_vec.as_mut_ptr();
         mem::forget(cstring_vec);
         ptr
-    }).unwrap_or_else({
-        log::error!("Failed to convert string vector: {:?}", str_vec);
+    }).unwrap_or_else(|_| {
+        log::error!("Failed to convert string vector");
         std::ptr::null_mut()
     })
 }
@@ -110,6 +122,7 @@ unsafe fn free_string_array(ptr: *mut *mut c_char, len: c_int) {
 
     // Afterwards the vector will be dropped and thus freed.
 }
+
 
 
 

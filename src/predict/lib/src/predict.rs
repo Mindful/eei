@@ -2,8 +2,7 @@ use fst::{Map, IntoStreamer};
 use fst::automaton::{Automaton, Str};
 use lazy_static::lazy_static;
 use crate::predict::PredictionError::*;
-use std::ffi::IntoStringError;
-use std::error::Error;
+use std::str::Utf8Error;
 
 pub struct Predictor {
     dictionary: Map<Vec<u8>>,
@@ -16,7 +15,7 @@ pub enum PredictionError {
     FstError(fst::Error),
     LevenshteinError(fst::automaton::LevenshteinError),
     MissingSymbol(String, u64),
-    FailedStringConversion(IntoStringError)
+    FailedStringConversion(Utf8Error)
 }
 
 

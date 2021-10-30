@@ -26,11 +26,6 @@ ibus_disconnected_cb (IBusBus  *bus,
     ibus_quit ();
 }
 
-static void debug_print(char* text) {
-    printf("%s\n", text);
-    fflush(stdout);
-}
-
 
 static void
 init (void)
@@ -46,7 +41,6 @@ init (void)
     ibus_factory_add_engine (factory, "eei", IBUS_TYPE_EEI_ENGINE);
 
     if (ibus) {
-        debug_print("requesting name");
         ibus_bus_request_name (bus, "joshua.tanner.IBus.eei", 0); //hangs if name doesn't match eei.xml
     }
     else {
@@ -60,7 +54,6 @@ init (void)
                                         "http://code.google.com/p/ibus/",
                                         "",
                                         "ibus-eei");
-        debug_print("adding engine");
         ibus_component_add_engine (component,
                                    ibus_engine_desc_new ("eei",
                                                          "Extended English Input",
@@ -70,14 +63,12 @@ init (void)
                                                          "Joshua Tanner <mindful.jt@gmail.com>",
                                                          PKGDATADIR"/icons/ibus-enchant.svg",
                                                          "us"));
-        debug_print("registering component");
         ibus_bus_register_component (bus, component);
     }
 }
 
 int main(int argc, char **argv)
 {
-    debug_print("start main");
 
     GError *error = NULL;
     GOptionContext *context;
@@ -93,11 +84,8 @@ int main(int argc, char **argv)
     }
 
     configure_logging();
-    debug_print("halfway through main");
-
 
     /* Go */
     init ();
     ibus_main ();
-    debug_print("done");
 }
