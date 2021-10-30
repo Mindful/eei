@@ -39,32 +39,8 @@ static gboolean
                                              guint               	 keyval,
                                              guint               	 keycode,
                                              guint               	 modifiers);
-static void ibus_eei_engine_focus_in    (IBusEngine             *engine);
-static void ibus_eei_engine_focus_out   (IBusEngine             *engine);
-static void ibus_eei_engine_reset       (IBusEngine             *engine);
 static void ibus_eei_engine_enable      (IBusEngine             *engine);
-static void ibus_eei_engine_disable     (IBusEngine             *engine);
-static void ibus_engine_set_cursor_location (IBusEngine             *engine,
-                                             gint                    x,
-                                             gint                    y,
-                                             gint                    w,
-                                             gint                    h);
-static void ibus_eei_engine_set_capabilities
-                                            (IBusEngine             *engine,
-                                             guint                   caps);
-static void ibus_eei_engine_page_up     (IBusEngine             *engine);
-static void ibus_eei_engine_page_down   (IBusEngine             *engine);
-static void ibus_eei_engine_cursor_up   (IBusEngine             *engine);
-static void ibus_eei_engine_cursor_down (IBusEngine             *engine);
-static void ibus_eei_property_activate  (IBusEngine             *engine,
-                                             const gchar            *prop_name,
-                                             gint                    prop_state);
-static void ibus_eei_engine_property_show
-											(IBusEngine             *engine,
-                                             const gchar            *prop_name);
-static void ibus_eei_engine_property_hide
-											(IBusEngine             *engine,
-                                             const gchar            *prop_name);
+
 
 static void ibus_eei_engine_commit_string
                                             (IBusEEIEngine      *eei,
@@ -86,7 +62,7 @@ ibus_eei_engine_class_init (IBusEEIEngineClass *klass)
 {
 	IBusObjectClass *ibus_object_class = IBUS_OBJECT_CLASS (klass);
 	IBusEngineClass *engine_class = IBUS_ENGINE_CLASS (klass);
-	
+
 	ibus_object_class->destroy = (IBusObjectDestroyFunc) ibus_eei_engine_destroy;
 
     engine_class->process_key_event = ibus_eei_engine_process_key_event;
@@ -98,6 +74,7 @@ ibus_eei_engine_init (IBusEEIEngine *eei)
 {
     eei->preedit = g_string_new ("");
     eei->cursor_pos = 0;
+    eei->lookup_table_visible = FALSE;
 
     eei->table = ibus_lookup_table_new (9, 0, TRUE, TRUE);
     g_object_ref_sink (eei->table);
@@ -127,22 +104,26 @@ ibus_eei_engine_enable  (IBusEngine *engine)
 }
 
 static void
+ibus_eei_engine_hide_lookup_table(IBusEEIEngine *eei) {
+    ibus_engine_hide_lookup_table ((IBusEngine *) eei);
+    eei->lookup_table_visible = FALSE;
+}
+
+static void
 ibus_eei_engine_update_lookup_table (IBusEEIEngine *eei)
 {
     WordPredictions predictions = get_word_predictions(eei->preedit->str);
     gint i;
 
     if (eei->preedit->len == 0) {
-        ibus_engine_hide_lookup_table ((IBusEngine *) eei);
-        eei->lookup_table_visible = FALSE;
+        ibus_eei_engine_hide_lookup_table(eei);
         return;
     }
 
     ibus_lookup_table_clear (eei->table);
 
     if (predictions.len == 0) {
-        ibus_engine_hide_lookup_table ((IBusEngine *) eei);
-        eei->lookup_table_visible = FALSE;
+        ibus_eei_engine_hide_lookup_table(eei);
         return;
     }
 
@@ -219,10 +200,10 @@ static void
 ibus_eei_engine_update (IBusEEIEngine *eei)
 {
     ibus_eei_engine_update_preedit (eei);
-    ibus_engine_hide_lookup_table ((IBusEngine *)eei);
+    ibus_eei_engine_hide_lookup_table(eei);
 }
 
-#define is_alpha(c) (((c) >= IBUS_a && (c) <= IBUS_z) || ((c) >= IBUS_A && (c) <= IBUS_Z))
+#define is_printable(c) ((c) >= IBUS_space && (c) <=IBUS_asciitilde)
 
 static gboolean 
 ibus_eei_engine_process_key_event (IBusEngine *engine,
@@ -329,7 +310,7 @@ ibus_eei_engine_process_key_event (IBusEngine *engine,
         return TRUE;
     }
 
-    if (is_alpha (keyval)) {
+    if (is_printable (keyval)) {
         g_string_insert_c (eei->preedit,
                            eei->cursor_pos,
                            keyval);
