@@ -5,15 +5,21 @@
 
 typedef struct _IBusEEIEngine IBusEEIEngine;
 typedef struct _IBusEEIEngineClass IBusEEIEngineClass;
+typedef struct EngineState EngineState;
+
+static gboolean GBOOL_FALSE = FALSE;
+static gboolean GBOOL_TRUE = TRUE;
 
 struct _IBusEEIEngine {
     IBusEngine parent;
+    IBusLookupTable *table;
+
+    EngineState *engine_state;
 
     /* members */
     GString *preedit;
     gint cursor_pos;
 
-    IBusLookupTable *table;
     gboolean lookup_table_visible;
 };
 

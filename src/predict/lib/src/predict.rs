@@ -18,6 +18,17 @@ pub enum PredictionError {
     FailedStringConversion(Utf8Error)
 }
 
+impl PredictionError {
+    pub fn error_message(&self) -> String {
+        match self {
+            FstError(err) => format!("FST error: {}", err),
+            LevenshteinError(err) => format!("Levenshtein error: {}", err),
+            MissingSymbol(sym, codepoint) => format!("Missing shortcode: {}, for codepoint {}", sym, codepoint),
+            FailedStringConversion(err) => format!("String conversion error: {}", err)
+        }
+    }
+}
+
 
 impl Predictor {
     pub fn word(&self, context: &str) -> Result<Vec<String>,  PredictionError>  {

@@ -13,16 +13,26 @@ use crate::predict::PredictionError;
 use crate::predict::PREDICTOR;
 use ibus::*;
 
+pub struct EngineState {
+    lookup_visible: bool,
+    emoji_input: bool,
+    preedit: String,
+    cursor_pos: u32
+}
 
-impl PredictionError {
-    fn error_message(&self) -> String {
-        match self {
-            FstError(err) => format!("FST error: {}", err),
-            LevenshteinError(err) => format!("Levenshtein error: {}", err),
-            MissingSymbol(sym, codepoint) => format!("Missing shortcode: {}, for codepoint {}", sym, codepoint),
-            FailedStringConversion(err) => format!("String conversion error: {}", err)
-        }
-    }
+#[no_mangle]
+pub unsafe extern "C" fn new_engine_state() -> *mut EngineState {
+    Box::into_raw(Box::new(EngineState {
+        lookup_visible: false,
+        emoji_input: false,
+        preedit: "".to_string(),
+        cursor_pos: 0
+    }))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn free_engine_state(engine_state: *mut EngineState) {
+    std::mem::drop(Box::from_raw(engine_state));
 }
 
 #[repr(C)]
@@ -40,18 +50,35 @@ pub struct SymbolPredictions {
 
 
 #[no_mangle]
-pub unsafe extern "C" fn ribus_eei_engine_process_key_event(
-    engine: *mut IBusEngine,
-    keyval: guint,
-    keycode: guint,
-    modifiers: guint,
-) -> gboolean {
+pub unsafe extern "C" fn ribus_eei_engine_process_key_event(engine: *mut IBusEngine, keyval: guint,
+    keycode: guint, modifiers: guint, ) -> gboolean {
     if (modifiers & IBusModifierType_IBUS_RELEASE_MASK) != 0 {
-        //if it's a key release
-        return 0;
+        return GBOOL_FALSE;
     }
 
-    1
+    if (modifiers & IBusModifierType_IBUS_CONTROL_MASK) == IBusModifierType_IBUS_CONTROL_MASK
+        && keyval == IBUS_s {
+        //TODO: turn emoji input mode on
+        return GBOOL_TRUE;
+    }
+
+    match keyval {
+        //TODO: handle other keyvals
+        IBUS_space => {
+            //TODO: reset word buffer, exit emoji mode
+            GBOOL_TRUE
+        }
+        IBUS_Return => {
+            //TODO: if we are selecting words or in emoji mode, commit our current selection
+            //otherwise reset word buffer
+            GBOOL_TRUE
+        }
+        IBUS_space..=IBUS_asciitilde => {
+            //TODO: add this char to the buffer or emoji editing
+            GBOOL_TRUE
+        }
+        _ => GBOOL_FALSE
+    }
 }
 
 #[no_mangle]

@@ -18,7 +18,7 @@ fn main() {
     )
         .allowlist_function("ibus_engine_.*")
         .allowlist_type("IBus.*")
-        .allowlist_var("IBUS_.*")
+        .allowlist_var("(IBUS_.*|GBOOL_.*)")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))

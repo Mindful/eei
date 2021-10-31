@@ -8,10 +8,16 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+typedef struct EngineState EngineState;
+
 typedef struct WordPredictions {
   int len;
   char **words;
 } WordPredictions;
+
+struct EngineState *new_engine_state(void);
+
+void free_engine_state(struct EngineState *engine_state);
 
 gboolean ribus_eei_engine_process_key_event(IBusEngine *engine,
                                             guint keyval,

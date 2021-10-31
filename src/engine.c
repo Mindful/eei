@@ -50,6 +50,7 @@ ibus_eei_engine_init (IBusEEIEngine *eei)
     eei->cursor_pos = 0;
     eei->lookup_table_visible = FALSE;
 
+    eei->engine_state = new_engine_state();
     eei->table = ibus_lookup_table_new (9, 0, TRUE, TRUE);
     g_object_ref_sink (eei->table);
 }
@@ -65,6 +66,10 @@ ibus_eei_engine_destroy (IBusEEIEngine *eei)
     if (eei->table) {
         g_object_unref (eei->table);
         eei->table = NULL;
+    }
+
+    if (eei->engine_state) {
+        free_engine_state(eei->engine_state);
     }
 
 	((IBusObjectClass *) ibus_eei_engine_parent_class)->destroy ((IBusObject *)eei);
