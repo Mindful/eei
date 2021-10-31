@@ -11,7 +11,7 @@ use log4rs::config::{Appender, Config, Root};
 use crate::predict::PredictionError::{FailedStringConversion, FstError, LevenshteinError, MissingSymbol};
 use crate::predict::PredictionError;
 use crate::predict::PREDICTOR;
-use ibus;
+use ibus::*;
 
 
 impl PredictionError {
@@ -38,38 +38,25 @@ pub struct SymbolPredictions {
     shortcodes: *mut *mut c_char
 }
 
-/*
-static gboolean
-			ibus_eei_engine_process_key_event
-                                            (IBusEngine             *engine,
-                                             guint               	 keyval,
-                                             guint               	 keycode,
-                                             guint               	 modifiers);
- */
-
-// #[no_mangle]
-// pub unsafe extern "C" fn ribus_eei_engine_process_key_event(
-//     engine: *mut ibus::IBusEngine,
-//     keyval: ibus::guint,
-//     keycode: ibus::guint,
-//     modifiers: ibus::guint,
-// ) {
-//
-// }
-
-/*
-
-static void
-ibus_eei_engine_hide_lookup_table(IBusEEIEngine *eei) {
-    ibus_engine_hide_lookup_table ((IBusEngine *) eei);
-    eei->lookup_table_visible = FALSE;
-}
- */
 
 #[no_mangle]
-pub unsafe extern "C" fn ibus_eei_engine_hide_lookup_table(engine: *mut ibus::IBusEEIEngine) {
-    log::info!("hide lookup table");
-    ibus::ibus_engine_hide_lookup_table(engine as *mut ibus::IBusEngine);
+pub unsafe extern "C" fn ribus_eei_engine_process_key_event(
+    engine: *mut IBusEngine,
+    keyval: guint,
+    keycode: guint,
+    modifiers: guint,
+) -> gboolean {
+    if (modifiers & IBusModifierType_IBUS_RELEASE_MASK) != 0 {
+        //if it's a key release
+        return 0;
+    }
+
+    1
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ibus_eei_engine_hide_lookup_table(engine: *mut IBusEEIEngine) {
+    ibus_engine_hide_lookup_table(engine as *mut IBusEngine);
     (*engine).lookup_table_visible = 0;
 }
 

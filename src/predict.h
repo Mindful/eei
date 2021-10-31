@@ -13,6 +13,11 @@ typedef struct WordPredictions {
   char **words;
 } WordPredictions;
 
+gboolean ribus_eei_engine_process_key_event(IBusEngine *engine,
+                                            guint keyval,
+                                            guint keycode,
+                                            guint modifiers);
+
 void ibus_eei_engine_hide_lookup_table(IBusEEIEngine *engine);
 
 void configure_logging(void);
