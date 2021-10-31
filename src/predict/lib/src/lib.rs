@@ -1,4 +1,6 @@
 mod predict;
+#[allow(warnings)]
+mod ibus;
 
 use std::ffi::{CString, CStr};
 use std::os::raw::{c_char, c_int};
@@ -11,6 +13,7 @@ use log4rs::config::{Appender, Config, Root};
 use crate::predict::PredictionError::{FailedStringConversion, FstError, LevenshteinError, MissingSymbol};
 use crate::predict::PredictionError;
 use crate::predict::PREDICTOR;
+use crate::ibus::{ibus_engine_hide_lookup_table, IBusEngine};
 
 impl PredictionError {
     fn error_message(&self) -> String {
@@ -36,16 +39,38 @@ pub struct SymbolPredictions {
     shortcodes: *mut *mut c_char
 }
 
+/*
+static gboolean
+			ibus_eei_engine_process_key_event
+                                            (IBusEngine             *engine,
+                                             guint               	 keyval,
+                                             guint               	 keycode,
+                                             guint               	 modifiers);
+ */
+
+// #[no_mangle]
+// pub unsafe extern "C" fn ribus_eei_engine_process_key_event(
+//     engine: *mut ibus::IBusEngine,
+//     keyval: ibus::guint,
+//     keycode: ibus::guint,
+//     modifiers: ibus::guint,
+// ) {
+//
+// }
+
+/*
+
+static void
+ibus_eei_engine_hide_lookup_table(IBusEEIEngine *eei) {
+    ibus_engine_hide_lookup_table ((IBusEngine *) eei);
+    eei->lookup_table_visible = FALSE;
+}
+ */
+
 #[no_mangle]
-pub unsafe extern "C" fn rust_info_log(characters: *mut c_char){
-    CStr::from_ptr(characters)
-        .to_str()
-        .map(|s| {
-            log::info!("log: {}", s);
-            mem::forget(s);
-        }).unwrap_or_else(|_| {
-            log::error!("Logging failed")
-    });
+pub unsafe extern "C" fn ibus_eei_engine_hide_lookup_table(engine: *mut ibus::IBusEEIEngine) {
+    ibus_engine_hide_lookup_table(engine as *mut IBusEngine);
+    (*engine).lookup_table_visible = 0;
 }
 
 #[no_mangle]

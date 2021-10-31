@@ -8,10 +8,428 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+typedef unsigned long gsize;
+
+typedef gsize GType;
+
+/**
+ * GTypeClass:
+ *
+ * An opaque structure used as the base of all classes.
+ */
+typedef struct _GTypeClass {
+  GType g_type;
+} _GTypeClass;
+
+typedef struct _GTypeClass GTypeClass;
+
+/**
+ * GTypeInstance:
+ *
+ * An opaque structure used as the base of all type instances.
+ */
+typedef struct _GTypeInstance {
+  GTypeClass *g_class;
+} _GTypeInstance;
+
+typedef struct _GTypeInstance GTypeInstance;
+
+typedef unsigned int guint;
+
+typedef struct _GData {
+  uint8_t _unused[0];
+} _GData;
+
+typedef struct _GData GData;
+
+/**
+ * GObject:
+ *
+ * All the fields in the GObject structure are private
+ * to the #GObject implementation and should never be accessed directly.
+ */
+typedef struct _GObject {
+  GTypeInstance g_type_instance;
+  guint ref_count;
+  GData *qdata;
+} _GObject;
+
+typedef struct _GObject GInitiallyUnowned;
+
+typedef unsigned int guint32;
+
+typedef struct _IBusObjectPrivate {
+  uint8_t _unused[0];
+} _IBusObjectPrivate;
+
+typedef struct _IBusObjectPrivate IBusObjectPrivate;
+
+/**
+ * IBusObject:
+ *
+ * All the fields in the <structname>IBusObject</structname> structure are
+ * private to the #IBusObject and should never be accessed directly.
+ */
+typedef struct _IBusObject {
+  GInitiallyUnowned parent;
+  guint32 flags;
+  IBusObjectPrivate *priv_;
+} _IBusObject;
+
+typedef struct _IBusObject IBusObject;
+
+typedef struct _IBusServicePrivate {
+  uint8_t _unused[0];
+} _IBusServicePrivate;
+
+typedef struct _IBusServicePrivate IBusServicePrivate;
+
+/**
+ * IBusService:
+ *
+ * An opaque data type representing an IBusService.
+ */
+typedef struct _IBusService {
+  IBusObject parent;
+  IBusServicePrivate *priv_;
+} _IBusService;
+
+typedef struct _IBusService IBusService;
+
+typedef struct _IBusEnginePrivate {
+  uint8_t _unused[0];
+} _IBusEnginePrivate;
+
+typedef struct _IBusEnginePrivate IBusEnginePrivate;
+
+typedef int gint;
+
+typedef gint gboolean;
+
+typedef struct _IBusRectangle {
+  gint x;
+  gint y;
+  gint width;
+  gint height;
+} _IBusRectangle;
+
+/**
+ * IBusRectangle:
+ * @x: x coordinate.
+ * @y: y coordinate.
+ * @width: width of the rectangle.
+ * @height: height of the renctangl.
+ *
+ * Rectangle definition.
+ */
+typedef struct _IBusRectangle IBusRectangle;
+
+/**
+ * IBusEngine:
+ * @enabled: Whether the engine is enabled.
+ * @has_focus: Whether the engine has focus.
+ * @cursor_area: Area of cursor.
+ * @client_capabilities: IBusCapabilite (client capabilities) flags.
+ *
+ * IBusEngine properties.
+ */
+typedef struct _IBusEngine {
+  IBusService parent;
+  IBusEnginePrivate *priv_;
+  gboolean enabled;
+  gboolean has_focus;
+  IBusRectangle cursor_area;
+  guint client_capabilities;
+} _IBusEngine;
+
+typedef struct _IBusEngine IBusEngine;
+
+typedef char gchar;
+
+typedef struct _GString {
+  gchar *str_;
+  gsize len;
+  gsize allocated_len;
+} _GString;
+
+typedef struct _GString GString;
+
+typedef struct _IBusSerializablePrivate {
+  uint8_t _unused[0];
+} _IBusSerializablePrivate;
+
+typedef struct _IBusSerializablePrivate IBusSerializablePrivate;
+
+/**
+ * IBusSerializable:
+ *
+ * All the fields in the <structname>IBusSerializable</structname> structure are
+ * private to the #IBusSerializable and should never be accessed directly.
+ */
+typedef struct _IBusSerializable {
+  IBusObject parent;
+  IBusSerializablePrivate *priv_;
+} _IBusSerializable;
+
+typedef struct _IBusSerializable IBusSerializable;
+
+typedef struct _GArray {
+  gchar *data;
+  guint len;
+} _GArray;
+
+typedef struct _GArray GArray;
+
+/**
+ * IBusLookupTable:
+ * @page_size: number of candidate shown per page.
+ * @cursor_pos: position index of cursor.
+ * @cursor_visible: whether the cursor is visible.
+ * @round: TRUE for lookup table wrap around.
+ * @orientation: orientation of the table.
+ * @candidates: Candidate words/phrases.
+ * @labels: Candidate labels which identify individual candidates in the same page. Default is 1, 2, 3, 4 ...
+ *
+ * An IBusLookuptable stores the candidate words or phrases for users to choose from.
+ * Note that some input methods allow you to select candidate by pressing non-numeric
+ * keys such as "asdfghjkl;".
+ * Developers of these input methods should change the labels with
+ * ibus_lookup_table_append_label().
+ */
+typedef struct _IBusLookupTable {
+  IBusSerializable parent;
+  guint page_size;
+  guint cursor_pos;
+  gboolean cursor_visible;
+  gboolean round;
+  gint orientation;
+  GArray *candidates;
+  GArray *labels;
+} _IBusLookupTable;
+
+typedef struct _IBusLookupTable IBusLookupTable;
+
+typedef struct _IBusEEIEngine {
+  IBusEngine parent;
+  GString *preedit;
+  gint cursor_pos;
+  IBusLookupTable *table;
+  gboolean lookup_table_visible;
+} _IBusEEIEngine;
+
+typedef struct _IBusEEIEngine IBusEEIEngine;
+
 typedef struct WordPredictions {
   int len;
   char **words;
 } WordPredictions;
+
+typedef struct _GDBusConnection {
+  uint8_t _unused[0];
+} _GDBusConnection;
+
+typedef struct _GDBusConnection GDBusConnection;
+
+/**
+ * IBusAttrList:
+ * @attributes: GArray that holds #IBusAttribute.
+ *
+ * Array of IBusAttribute.
+ */
+typedef struct _IBusAttrList {
+  IBusSerializable parent;
+  GArray *attributes;
+} _IBusAttrList;
+
+typedef struct _IBusAttrList IBusAttrList;
+
+/**
+ * IBusText:
+ * @is_static: Whether @text is static, i.e., no need and will not be freed. Only TRUE if IBusText is newed from ibus_text_new_from_static_string().
+ * @text: The string content of IBusText in UTF-8.
+ * @attrs: Associated IBusAttributes.
+ *
+ * A text object in IBus.
+ */
+typedef struct _IBusText {
+  IBusSerializable parent;
+  gboolean is_static;
+  gchar *text;
+  IBusAttrList *attrs;
+} _IBusText;
+
+typedef struct _IBusText IBusText;
+
+/**
+ * IBusPreeditFocusMode:
+ * @IBUS_ENGINE_PREEDIT_CLEAR: pre-edit text is cleared.
+ * @IBUS_ENGINE_PREEDIT_COMMIT: pre-edit text is committed.
+ *
+ * Pre-edit commit mode when the focus is lost.
+ */
+typedef unsigned int IBusPreeditFocusMode;
+
+/**
+ * IBusPropList:
+ * @properties: GArray that holds IBusProperties.
+ *
+ * An array of IBusProperties.
+ */
+typedef struct _IBusPropList {
+  IBusSerializable parent;
+  GArray *properties;
+} _IBusPropList;
+
+typedef struct _IBusPropList IBusPropList;
+
+typedef struct _IBusPropertyPrivate {
+  uint8_t _unused[0];
+} _IBusPropertyPrivate;
+
+typedef struct _IBusPropertyPrivate IBusPropertyPrivate;
+
+typedef void *gpointer;
+
+/**
+ * IBusProperty:
+ * UI component for input method engine property.
+ */
+typedef struct _IBusProperty {
+  IBusSerializable parent;
+  IBusPropertyPrivate *priv_;
+  gpointer pdummy[7];
+} _IBusProperty;
+
+typedef struct _IBusProperty IBusProperty;
+
+typedef struct _IBusEngineSimplePrivate {
+  uint8_t _unused[0];
+} _IBusEngineSimplePrivate;
+
+typedef struct _IBusEngineSimplePrivate IBusEngineSimplePrivate;
+
+/**
+ * IBusEngineSimple:
+ *
+ * IBusEngineSimple properties.
+ */
+typedef struct _IBusEngineSimple {
+  IBusEngine parent;
+  IBusEngineSimplePrivate *priv_;
+} _IBusEngineSimple;
+
+typedef struct _IBusEngineSimple IBusEngineSimple;
+
+typedef unsigned short guint16;
+
+typedef struct _IBusEngineDescPrivate {
+  uint8_t _unused[0];
+} _IBusEngineDescPrivate;
+
+typedef struct _IBusEngineDescPrivate IBusEngineDescPrivate;
+
+/**
+ * IBusEngineDesc:
+ *
+ * Input method engine description data.
+ * You can get extended values with g_object_get_properties.
+ */
+typedef struct _IBusEngineDesc {
+  IBusSerializable parent;
+  IBusEngineDescPrivate *priv_;
+} _IBusEngineDesc;
+
+typedef struct _IBusEngineDesc IBusEngineDesc;
+
+typedef struct _GList {
+  gpointer data;
+  GList *next;
+  GList *prev;
+} _GList;
+
+typedef struct _GList GList;
+
+/**
+ * IBusXML:
+ * @name: Name of XML tag.
+ * @text: Text enclosed by XML start tag and end tag. i.e. <tag>text</tag>.
+ * @attributes: Attributes of the XML node.
+ * @sub_nodes: Children node of this XML node.
+ *
+ * A data type representing an XML node.
+ */
+typedef struct IBusXML {
+  gchar *name;
+  gchar *text;
+  gchar **attributes;
+  GList *sub_nodes;
+} IBusXML;
+
+/**
+ * GParamFlags:
+ * @G_PARAM_READABLE: the parameter is readable
+ * @G_PARAM_WRITABLE: the parameter is writable
+ * @G_PARAM_READWRITE: alias for %G_PARAM_READABLE | %G_PARAM_WRITABLE
+ * @G_PARAM_CONSTRUCT: the parameter will be set upon object construction
+ * @G_PARAM_CONSTRUCT_ONLY: the parameter can only be set upon object construction
+ * @G_PARAM_LAX_VALIDATION: upon parameter conversion (see g_param_value_convert())
+ *  strict validation is not required
+ * @G_PARAM_STATIC_NAME: the string used as name when constructing the
+ *  parameter is guaranteed to remain valid and
+ *  unmodified for the lifetime of the parameter.
+ *  Since 2.8
+ * @G_PARAM_STATIC_NICK: the string used as nick when constructing the
+ *  parameter is guaranteed to remain valid and
+ *  unmmodified for the lifetime of the parameter.
+ *  Since 2.8
+ * @G_PARAM_STATIC_BLURB: the string used as blurb when constructing the
+ *  parameter is guaranteed to remain valid and
+ *  unmodified for the lifetime of the parameter.
+ *  Since 2.8
+ * @G_PARAM_EXPLICIT_NOTIFY: calls to g_object_set_property() for this
+ *   property will not automatically result in a "notify" signal being
+ *   emitted: the implementation must call g_object_notify() themselves
+ *   in case the property actually changes.  Since: 2.42.
+ * @G_PARAM_PRIVATE: internal
+ * @G_PARAM_DEPRECATED: the parameter is deprecated and will be removed
+ *  in a future version. A warning will be generated if it is used
+ *  while running with G_ENABLE_DIAGNOSTIC=1.
+ *  Since 2.26
+ *
+ * Through the #GParamFlags flag values, certain aspects of parameters
+ * can be configured. See also #G_PARAM_STATIC_STRINGS.
+ */
+typedef int GParamFlags;
+
+#define GParamFlags_G_PARAM_READABLE 1
+
+#define GParamFlags_G_PARAM_WRITABLE 2
+
+#define GParamFlags_G_PARAM_READWRITE 3
+
+#define GParamFlags_G_PARAM_CONSTRUCT 4
+
+#define GParamFlags_G_PARAM_CONSTRUCT_ONLY 8
+
+#define GParamFlags_G_PARAM_LAX_VALIDATION 16
+
+#define GParamFlags_G_PARAM_STATIC_NAME 32
+
+#define GParamFlags_G_PARAM_PRIVATE 32
+
+#define GParamFlags_G_PARAM_STATIC_NICK 64
+
+#define GParamFlags_G_PARAM_STATIC_BLURB 128
+
+#define GParamFlags_G_PARAM_EXPLICIT_NOTIFY 1073741824
+
+#define GParamFlags_G_PARAM_DEPRECATED -2147483648
+
+#define IBusPreeditFocusMode_IBUS_ENGINE_PREEDIT_CLEAR 0
+
+#define IBusPreeditFocusMode_IBUS_ENGINE_PREEDIT_COMMIT 1
+
+void ibus_eei_engine_hide_lookup_table(IBusEEIEngine engine);
 
 void rust_info_log(char *characters);
 
@@ -20,5 +438,578 @@ void configure_logging(void);
 struct WordPredictions get_word_predictions(char *characters);
 
 void free_word_predictions(struct WordPredictions predictions);
+
+extern GType ibus_engine_get_type(void);
+
+/**
+ * ibus_engine_new:
+ * @engine_name: Name of the IBusObject.
+ * @object_path: Path for IBusService.
+ * @connection: An opened GDBusConnection.
+ *
+ * Create a new #IBusEngine.
+ *
+ * Returns: A newly allocated IBusEngine.
+ */
+extern IBusEngine *ibus_engine_new(const gchar *engine_name,
+                                   const gchar *object_path,
+                                   GDBusConnection *connection);
+
+/**
+ * ibus_engine_new_with_type:
+ * @engine_type: GType of #IBusEngine.
+ * @engine_name: Name of the IBusObject.
+ * @object_path: Path for IBusService.
+ * @connection: An opened GDBusConnection.
+ *
+ * Create a new #IBusEngine.
+ *
+ * Returns: A newly allocated IBusEngine.
+ */
+extern IBusEngine *ibus_engine_new_with_type(GType engine_type,
+                                             const gchar *engine_name,
+                                             const gchar *object_path,
+                                             GDBusConnection *connection);
+
+/**
+ * ibus_engine_commit_text:
+ * @engine: An IBusEngine.
+ * @text: String commit to IBusEngine.
+ *
+ * Commit output of input method to IBus client.
+ *
+ * (Note: The text object will be released, if it is floating.
+ *  If caller want to keep the object, caller should make the object
+ *  sink by g_object_ref_sink.)
+ */
+extern void ibus_engine_commit_text(IBusEngine *engine, IBusText *text);
+
+/**
+ * ibus_engine_update_preedit_text:
+ * @engine: An IBusEngine.
+ * @text: Update content.
+ * @cursor_pos: Current position of cursor
+ * @visible: Whether the pre-edit buffer is visible.
+ *
+ * Update the pre-edit buffer.
+ *
+ * (Note: The text object will be released, if it is floating.
+ *  If caller want to keep the object, caller should make the object
+ *  sink by g_object_ref_sink.)
+ */
+extern void ibus_engine_update_preedit_text(IBusEngine *engine,
+                                            IBusText *text,
+                                            guint cursor_pos,
+                                            gboolean visible);
+
+/**
+ * ibus_engine_update_preedit_text_with_mode:
+ * @engine: An IBusEngine.
+ * @text: Update content.
+ * @cursor_pos: Current position of cursor
+ * @visible: Whether the pre-edit buffer is visible.
+ * @mode: Pre-edit commit mode when the focus is lost.
+ *
+ * Update the pre-edit buffer with commit mode. Similar to
+ * ibus_engine_update_preedit_text(), this function allows users to specify
+ * the behavior on focus out when the pre-edit buffer is visible.
+ *
+ * If @mode is IBUS_ENGINE_PREEDIT_COMMIT, contents of the pre-edit buffer
+ * will be committed and cleared.
+ * If @mode is IBUS_ENGINE_PREEDIT_CLEAR, contents of the pre-edit buffer
+ * will be cleared only.
+ *
+ * (Note: The text object will be released, if it is floating.
+ *  If caller want to keep the object, caller should make the object
+ *  sink by g_object_ref_sink.)
+ */
+extern void ibus_engine_update_preedit_text_with_mode(IBusEngine *engine,
+                                                      IBusText *text,
+                                                      guint cursor_pos,
+                                                      gboolean visible,
+                                                      IBusPreeditFocusMode mode);
+
+/**
+ * ibus_engine_show_preedit_text:
+ * @engine: An IBusEngine.
+ *
+ * Show the pre-edit buffer.
+ */
+extern void ibus_engine_show_preedit_text(IBusEngine *engine);
+
+/**
+ * ibus_engine_hide_preedit_text:
+ * @engine: An IBusEngine.
+ *
+ * Hide the pre-edit buffer.
+ */
+extern void ibus_engine_hide_preedit_text(IBusEngine *engine);
+
+/**
+ * ibus_engine_update_auxiliary_text:
+ * @engine: An IBusEngine.
+ * @text: Update content.
+ * @visible: Whether the auxiliary text bar is visible.
+ *
+ * Update the auxiliary bar.
+ *
+ * (Note: The text object will be released, if it is floating.
+ *  If caller want to keep the object, caller should make the object
+ *  sink by g_object_ref_sink.)
+ */
+extern void ibus_engine_update_auxiliary_text(IBusEngine *engine, IBusText *text, gboolean visible);
+
+/**
+ * ibus_engine_show_auxiliary_text:
+ * @engine: An IBusEngine.
+ *
+ * Show the auxiliary bar.
+ */
+extern void ibus_engine_show_auxiliary_text(IBusEngine *engine);
+
+/**
+ * ibus_engine_hide_auxiliary_text:
+ * @engine: An IBusEngine.
+ *
+ * Hide the auxiliary bar.
+ */
+extern void ibus_engine_hide_auxiliary_text(IBusEngine *engine);
+
+/**
+ * ibus_engine_update_lookup_table:
+ * @engine: An IBusEngine.
+ * @lookup_table: An lookup_table.
+ * @visible: Whether the lookup_table is visible.
+ *
+ * Update the lookup table.
+ *
+ * (Note: The table object will be released, if it is floating.
+ *  If caller want to keep the object, caller should make the object
+ *  sink by g_object_ref_sink.)
+ */
+extern void ibus_engine_update_lookup_table(IBusEngine *engine,
+                                            IBusLookupTable *lookup_table,
+                                            gboolean visible);
+
+/**
+ * ibus_engine_update_lookup_table_fast:
+ * @engine: An IBusEngine.
+ * @lookup_table: An lookup_table.
+ * @visible: Whether the lookup_table is visible.
+ *
+ * Fast update for big lookup table.
+ *
+ * If size of lookup table is not over table page size *4,
+ * then it calls ibus_engine_update_lookup_table().
+ *
+ * (Note: The table object will be released, if it is floating.
+ *  If caller want to keep the object, caller should make the object
+ *  sink by g_object_ref_sink.)
+ */
+extern void ibus_engine_update_lookup_table_fast(IBusEngine *engine,
+                                                 IBusLookupTable *lookup_table,
+                                                 gboolean visible);
+
+/**
+ * ibus_engine_show_lookup_table:
+ * @engine: An IBusEngine.
+ *
+ * Show the lookup table.
+ */
+extern void ibus_engine_show_lookup_table(IBusEngine *engine);
+
+/**
+ * ibus_engine_hide_lookup_table:
+ * @engine: An IBusEngine.
+ *
+ * Hide the lookup table.
+ */
+extern void ibus_engine_hide_lookup_table(IBusEngine *engine);
+
+/**
+ * ibus_engine_forward_key_event:
+ * @engine: An IBusEngine.
+ * @keyval: KeySym.
+ * @keycode: keyboard scancode.
+ * @state: Key modifier flags.
+ *
+ * Forward the key event.
+ */
+extern void ibus_engine_forward_key_event(IBusEngine *engine,
+                                          guint keyval,
+                                          guint keycode,
+                                          guint state);
+
+/**
+ * ibus_engine_register_properties:
+ * @engine: An IBusEngine.
+ * @prop_list: Property List.
+ *
+ * Register and show properties in language bar.
+ *
+ * (Note: The prop_list object will be released, if it is floating.
+ *  If caller want to keep the object, caller should make the object
+ *  sink by g_object_ref_sink.)
+ */
+extern void ibus_engine_register_properties(IBusEngine *engine, IBusPropList *prop_list);
+
+/**
+ * ibus_engine_update_property:
+ * @engine: An IBusEngine.
+ * @prop: IBusProperty to be updated.
+ *
+ * Update the state displayed in language bar.
+ *
+ * (Note: The prop object will be released, if it is floating.
+ *  If caller want to keep the object, caller should make the object
+ *  sink by g_object_ref_sink.)
+ */
+extern void ibus_engine_update_property(IBusEngine *engine, IBusProperty *prop);
+
+/**
+ * ibus_engine_delete_surrounding_text:
+ * @engine: An IBusEngine.
+ * @offset: The offset of the first char.
+ * @nchars: Number of chars to be deleted.
+ *
+ * Delete surrounding text.
+ */
+extern void ibus_engine_delete_surrounding_text(IBusEngine *engine, gint offset, guint nchars);
+
+/**
+ * ibus_engine_get_surrounding_text:
+ * @engine: An IBusEngine.
+ * @text: (out) (transfer none) (allow-none): Location to store surrounding text.
+ * @cursor_pos: (out) (allow-none): Cursor position in characters in @text.
+ * @anchor_pos: (out) (allow-none): Anchor position of selection in @text.
+ *
+ * Get surrounding text.
+ *
+ * It is also used to tell the input-context that the engine will
+ * utilize surrounding-text.  In that case, it must be called in
+ * #IBusEngine::enable handler, with both @text and @cursor set to
+ * %NULL.
+ *
+ * See also: #IBusEngine::set-surrounding-text
+ */
+extern void ibus_engine_get_surrounding_text(IBusEngine *engine,
+                                             IBusText **text,
+                                             guint *cursor_pos,
+                                             guint *anchor_pos);
+
+/**
+ * ibus_engine_get_content_type:
+ * @engine: An #IBusEngine.
+ * @purpose: (out) (allow-none): Primary purpose of the input context.
+ * @hints: (out) (allow-none): Hints that augument @purpose.
+ *
+ * Get content-type (primary purpose and hints) of the current input
+ * context.
+ *
+ * See also: #IBusEngine::set-content-type
+ */
+extern void ibus_engine_get_content_type(IBusEngine *engine, guint *purpose, guint *hints);
+
+/**
+ * ibus_engine_get_name:
+ * @engine: An IBusEngine.
+ *
+ * Return the name of #IBusEngine.
+ *
+ * Returns: Name of #IBusEngine.
+ */
+extern const gchar *ibus_engine_get_name(IBusEngine *engine);
+
+extern GType ibus_engine_simple_get_type(void);
+
+/**
+ * ibus_engine_simple_add_table:
+ * @simple: An IBusEngineSimple.
+ * @data: (element-type guint16) (array): The table which must be available
+ *      during the whole life of the simple engine.
+ * @max_seq_len: Maximum length of a swquence in the table (cannot be greater
+ *      than %IBUS_MAX_COMPOSE_LEN)
+ * @n_seqs: number of sequences in the table
+ *
+ * Adds an additional table to search to the engine. Each row of the table
+ * consists of max_seq_len key symbols followed by two guint16 interpreted as
+ * the high and low words of a gunicode value. Tables are searched starting from
+ * the last added.
+ *
+ * The table must be sorted in dictionary order on the numeric value of the key
+ * symbol fields. (Values beyond the length of the sequence should be zero.)
+ */
+extern void ibus_engine_simple_add_table(IBusEngineSimple *simple,
+                                         const guint16 *data,
+                                         gint max_seq_len,
+                                         gint n_seqs);
+
+/**
+ * ibus_engine_simple_add_table_by_locale:
+ * @simple: An IBusEngineSimple.
+ * @locale: (allow-none): The locale name. If the locale is %NULL,
+ *                        the current locale is used.
+ *
+ * Call ibus_engine_simple_add_table() internally by locale.
+ *
+ * Returns: %TRUE if the @locale is matched to the table.
+ */
+extern gboolean ibus_engine_simple_add_table_by_locale(IBusEngineSimple *simple,
+                                                       const gchar *locale);
+
+/**
+ * ibus_engine_simple_add_compose_file:
+ * @simple: An IBusEngineSimple.
+ * @file: The compose file.
+ *
+ * Call ibus_engine_simple_add_table() internally by locale.
+ *
+ * Returns: %TRUE if the @file is loaded.
+ */
+extern gboolean ibus_engine_simple_add_compose_file(IBusEngineSimple *simple, const gchar *file);
+
+extern GType ibus_engine_desc_get_type(void);
+
+/**
+ * ibus_engine_desc_new:
+ * @name: Name of the engine.
+ * @longname: Long name of the input method engine.
+ * @description: Input method engine description.
+ * @language: Language (e.g. zh, jp) supported by this input method engine.
+ * @license: License of the input method engine.
+ * @author: Author of the input method engine.
+ * @icon: Icon file of this engine.
+ * @layout: Keyboard layout
+ *
+ * Creates a new #IBusEngineDesc.
+ * If layout is "default", the engine inherits the current layout and
+ * does not change the layout. The layouts "default" and "" are same.
+ * E.g. If you switch JP XKB engine and an input method engine (IME),
+ * the IME inherits the JP layout.
+ *
+ * Returns: A newly allocated IBusEngineDesc.
+ */
+extern IBusEngineDesc *ibus_engine_desc_new(const gchar *name,
+                                            const gchar *longname,
+                                            const gchar *description,
+                                            const gchar *language,
+                                            const gchar *license,
+                                            const gchar *author,
+                                            const gchar *icon,
+                                            const gchar *layout);
+
+/**
+ * ibus_engine_desc_new_varargs:
+ * @first_property_name: Name of the first property.
+ * @...: the NULL-terminated arguments of the properties and values.
+ *
+ * Creates a new #IBusEngineDesc.
+ * ibus_engine_desc_new_varargs() supports the va_list format.
+ * name property is required. e.g.
+ * ibus_engine_desc_new_varargs("name", "ibus-foo", "language", "us", NULL)
+ * If layout is "default", the engine inherits the current layout and
+ * does not change the layout. The layouts "default" and "" are same.
+ * E.g. If you switch JP XKB engine and an input method engine (IME),
+ * the IME inherits the JP layout.
+ *
+ * Returns: A newly allocated IBusEngineDesc.
+ */
+extern IBusEngineDesc *ibus_engine_desc_new_varargs(const gchar *first_property_name);
+
+/**
+ * ibus_engine_desc_new_from_xml_node:
+ * @node: An XML node
+ *
+ * Creates a new IBusEngineDesc from an XML node.
+ * <note><para>This function is called by ibus_component_new_from_file(),
+ *  so developers normally do not need to call it directly.
+ * </para></note>
+ *
+ * Returns: A newly allocated IBusEngineDesc that contains description from
+ * @node.
+ */
+extern IBusEngineDesc *ibus_engine_desc_new_from_xml_node(struct IBusXML *node);
+
+/**
+ * ibus_engine_desc_get_name:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the name property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: name property in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_name(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_longname:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the longname property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: longname property in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_longname(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_description:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the description property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: description property in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_description(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_language:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the language property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: language property in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_language(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_license:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the license property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: license property in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_license(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_author:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the author property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: author property in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_author(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_icon:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the icon property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: icon property in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_icon(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_layout:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the layout property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: layout property in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_layout(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_layout_variant:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the keyboard variant property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: keyboard variant property in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_layout_variant(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_layout_option:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the keyboard option property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: keyboard option property in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_layout_option(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_rank:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the rank property in IBusEngineDesc.
+ *
+ * Returns: rank property in IBusEngineDesc
+ */
+extern guint ibus_engine_desc_get_rank(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_hotkeys:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the hotkeys property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: hotkeys property in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_hotkeys(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_symbol:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the symbol property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: symbol property in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_symbol(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_setup:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the setup property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: setup property in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_setup(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_version:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the version property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: version in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_version(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_textdomain:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the textdomain property in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: textdomain in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_textdomain(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_get_icon_prop_key:
+ * @info: An IBusEngineDesc
+ *
+ * Gets the key of IBusProperty to load the panel icon dynamically
+ * in IBusEngineDesc. It should not be freed.
+ *
+ * Returns: IBusProperty.key for dynamic panel icon in IBusEngineDesc
+ */
+extern const gchar *ibus_engine_desc_get_icon_prop_key(IBusEngineDesc *info);
+
+/**
+ * ibus_engine_desc_output:
+ * @info: An IBusEngineDesc
+ * @output: XML-formatted Input method engine description.
+ * @indent: Number of indent (showed as 4 spaces).
+ *
+ * Output XML-formatted input method engine description.
+ * The result will be append to GString specified in @output.
+ */
+extern void ibus_engine_desc_output(IBusEngineDesc *info, GString *output, gint indent);
 
 #endif /* predict_rs */

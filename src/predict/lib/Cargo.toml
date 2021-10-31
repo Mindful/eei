@@ -15,3 +15,5 @@ log4rs = "1.0.0"
 
 [build-dependencies]
 cbindgen = "0.20.0"
+bindgen = "0.59.1"
+pkg-config = "0.3.22"

@@ -2,32 +2,6 @@
 #include <stdio.h>
 #include "predict.h"
 
-#define DEBUG
-
-#ifdef DEBUG
-#define debug_log(x) rust_info_log(x)
-#else
-#define debug_log(x)
-#endif
-
-
-typedef struct _IBusEEIEngine IBusEEIEngine;
-typedef struct _IBusEEIEngineClass IBusEEIEngineClass;
-
-struct _IBusEEIEngine {
-	IBusEngine parent;
-
-    /* members */
-    GString *preedit;
-    gint cursor_pos;
-
-    IBusLookupTable *table;
-    gboolean lookup_table_visible;
-};
-
-struct _IBusEEIEngineClass {
-	IBusEngineClass parent;
-};
 
 /* functions prototype */
 static void	ibus_eei_engine_class_init	(IBusEEIEngineClass	*klass);
@@ -104,12 +78,6 @@ ibus_eei_engine_enable  (IBusEngine *engine)
 }
 
 static void
-ibus_eei_engine_hide_lookup_table(IBusEEIEngine *eei) {
-    ibus_engine_hide_lookup_table ((IBusEngine *) eei);
-    eei->lookup_table_visible = FALSE;
-}
-
-static void
 ibus_eei_engine_update_lookup_table (IBusEEIEngine *eei)
 {
     WordPredictions predictions = get_word_predictions(eei->preedit->str);
@@ -148,6 +116,7 @@ ibus_eei_engine_update_preedit (IBusEEIEngine *eei)
                            ibus_attr_underline_new (IBUS_ATTR_UNDERLINE_SINGLE, 0, eei->preedit->len));
 
 
+    ibus_engine_update_auxiliary_text((IBusEngine *)eei, ibus_text_new_from_static_string("AUXTEXT"), TRUE);
     ibus_engine_update_preedit_text ((IBusEngine *)eei,
                                      text,
                                      eei->cursor_pos,
@@ -176,7 +145,6 @@ ibus_eei_engine_commit_word (IBusEEIEngine *eei)
 {
     guint cursor_pos = ibus_lookup_table_get_cursor_pos(eei->table);
     IBusText *text = ibus_lookup_table_get_candidate(eei->table, cursor_pos);
-    debug_log(text->text);
     ibus_engine_commit_text((IBusEngine *)eei, text);
     g_string_assign(eei->preedit, "");
     eei->cursor_pos = 0;
@@ -238,10 +206,8 @@ ibus_eei_engine_process_key_event (IBusEngine *engine,
         return ibus_eei_engine_commit_preedit (eei);
     case IBUS_Return:
         if (eei->lookup_table_visible) {
-            debug_log("commit word");
             return ibus_eei_engine_commit_word(eei);
         } else {
-            debug_log("commit preedit");
             return ibus_eei_engine_commit_preedit (eei);
         }
 
