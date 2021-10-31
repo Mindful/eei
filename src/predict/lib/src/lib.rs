@@ -1,6 +1,4 @@
 mod predict;
-#[allow(warnings)]
-mod ibus;
 
 use std::ffi::{CString, CStr};
 use std::os::raw::{c_char, c_int};
@@ -13,7 +11,8 @@ use log4rs::config::{Appender, Config, Root};
 use crate::predict::PredictionError::{FailedStringConversion, FstError, LevenshteinError, MissingSymbol};
 use crate::predict::PredictionError;
 use crate::predict::PREDICTOR;
-use crate::ibus::{ibus_engine_hide_lookup_table, IBusEngine};
+use ibus;
+
 
 impl PredictionError {
     fn error_message(&self) -> String {
@@ -69,7 +68,8 @@ ibus_eei_engine_hide_lookup_table(IBusEEIEngine *eei) {
 
 #[no_mangle]
 pub unsafe extern "C" fn ibus_eei_engine_hide_lookup_table(engine: *mut ibus::IBusEEIEngine) {
-    ibus_engine_hide_lookup_table(engine as *mut IBusEngine);
+    log::info!("hide lookup table");
+    ibus::ibus_engine_hide_lookup_table(engine as *mut ibus::IBusEngine);
     (*engine).lookup_table_visible = 0;
 }
 

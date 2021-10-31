@@ -7,7 +7,7 @@ autom4te.cache/
 stamp-*
 *.xml
 src/predict/target
-src/predict/lib/src/ibus.rs
+src/predict/ibus/src/ibus_bindings.rs
 
 dictionary.fst
 hunspell_US.txt
