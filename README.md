@@ -1,5 +1,6 @@
-Based off of https://github.com/vn-input/ibus-unikey
-and https://github.com/phuang/ibus-tmpl.
+Based off of https://github.com/vn-input/ibus-unikey, 
+https://github.com/phuang/ibus-tmpl and 
+https://github.com/ibus/ibus/blob/master/src/ibusenginesimple.c
 
 ```shell
 ./install.sh

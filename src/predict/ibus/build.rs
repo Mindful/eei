@@ -16,7 +16,7 @@ fn main() {
             b.clang_arg("-I".to_string()+path.to_str().unwrap())
         }
     )
-        .allowlist_function("ibus_engine_.*")
+        .allowlist_function("ibus_.*")
         .allowlist_type("IBus.*")
         .allowlist_var("(IBUS_.*|GBOOL_.*)")
         // Tell cargo to invalidate the built crate whenever any of the

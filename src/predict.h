@@ -8,28 +8,17 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-typedef struct EngineState EngineState;
+typedef struct EngineCore EngineCore;
 
-typedef struct WordPredictions {
-  int len;
-  char **words;
-} WordPredictions;
+struct EngineCore *new_engine_core(IBusEEIEngine *parent_engine);
 
-struct EngineState *new_engine_state(void);
+void free_engine_core(struct EngineCore *engine_state);
 
-void free_engine_state(struct EngineState *engine_state);
-
-gboolean ribus_eei_engine_process_key_event(IBusEngine *engine,
-                                            guint keyval,
-                                            guint keycode,
-                                            guint modifiers);
-
-void ibus_eei_engine_hide_lookup_table(IBusEEIEngine *engine);
+gboolean ibus_eei_engine_process_key_event(IBusEngine *engine,
+                                           guint keyval,
+                                           guint keycode,
+                                           guint modifiers);
 
 void configure_logging(void);
-
-struct WordPredictions get_word_predictions(char *characters);
-
-void free_word_predictions(struct WordPredictions predictions);
 
 #endif /* predict_rs */

@@ -5,7 +5,7 @@
 
 typedef struct _IBusEEIEngine IBusEEIEngine;
 typedef struct _IBusEEIEngineClass IBusEEIEngineClass;
-typedef struct EngineState EngineState;
+typedef struct EngineCore EngineCore;
 
 static gboolean GBOOL_FALSE = FALSE;
 static gboolean GBOOL_TRUE = TRUE;
@@ -14,13 +14,7 @@ struct _IBusEEIEngine {
     IBusEngine parent;
     IBusLookupTable *table;
 
-    EngineState *engine_state;
-
-    /* members */
-    GString *preedit;
-    gint cursor_pos;
-
-    gboolean lookup_table_visible;
+    EngineCore *engine_core;
 };
 
 struct _IBusEEIEngineClass {
