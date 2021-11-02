@@ -1,3 +1,4 @@
+#![allow(non_upper_case_globals)]
 mod predict;
 
 use std::ffi::{CString, CStr, NulError};
@@ -11,7 +12,7 @@ use log4rs::config::{Appender, Config, Root};
 use crate::predict::PredictionError::{FailedStringConversion, FstError, LevenshteinError, MissingSymbol};
 use crate::predict::PredictionError;
 use crate::predict::PREDICTOR;
-use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_RELEASE_MASK, IBusModifierType_IBUS_CONTROL_MASK, IBUS_s, IBUS_asciitilde, IBUS_space, IBUS_Return, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_lookup_table_append_label, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, IBUS_Left, IBUS_Right, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down};
+use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_RELEASE_MASK, IBusModifierType_IBUS_CONTROL_MASK, IBUS_e, IBUS_asciitilde, IBUS_space, IBUS_Return, IBUS_BackSpace, IBUS_Escape, IBUS_Page_Down, IBUS_Page_Up, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_lookup_table_append_label, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, IBUS_Left, IBUS_Right, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down, ibus_engine_hide_auxiliary_text, ibus_lookup_table_set_label, ibus_lookup_table_page_down, ibus_lookup_table_page_up};
 
 
 pub struct EngineCore {
@@ -28,6 +29,7 @@ unsafe fn into_ibus_string(input: String) -> Result<*mut IBusText, NulError> {
 }
 
 impl EngineCore {
+
     fn parent_engine_as_ibus_engine(&self) -> *mut IBusEngine {
         self.parent_engine as *mut IBusEngine
     }
@@ -48,6 +50,7 @@ impl EngineCore {
         }
 
         self.symbol_input = true;
+        self.lookup_visible = true;
         // ibus_lookup_table_clear((*self.parent_engine).table);
         // ibus_engine_show_lookup_table(engine as *mut IBusEngine);
         ibus_engine_update_lookup_table(self.parent_engine as *mut IBusEngine, (*self.parent_engine).table, GBOOL_TRUE);
@@ -60,24 +63,21 @@ impl EngineCore {
         }
 
         self.symbol_input = false;
+        self.lookup_visible = false;
         self.symbol_preedit.clear();
-        ibus_engine_hide_lookup_table(self.parent_engine as *mut IBusEngine);
+        ibus_engine_hide_lookup_table(self.parent_engine_as_ibus_engine());
+        ibus_engine_hide_auxiliary_text(self.parent_engine_as_ibus_engine());
         GBOOL_TRUE
     }
 
     unsafe fn commit_char(&mut self, keyval: guint) -> gboolean {
         self.word_buffer.push((keyval as u8) as char);
+        log::info!("append {} and commit {}", keyval as u8, keyval as gchar);
         ibus_engine_commit_text(self.parent_engine_as_ibus_engine(), ibus_text_new_from_string(&(keyval as gchar)));
         GBOOL_TRUE
     }
 
-    unsafe fn symbol_input_char(&mut self, keyval: guint) -> gboolean {
-        if !self.symbol_input {
-            log::error!("Symbol input char called outside symbol input mode");
-            return GBOOL_FALSE;
-        }
-
-        self.symbol_preedit.push((keyval as u8) as char);
+    unsafe fn symbol_input_update(&mut self) -> gboolean {
         match into_ibus_string(self.symbol_preedit.clone()) {
             Ok(ibus_string) => {
                 ibus_engine_update_auxiliary_text(self.parent_engine_as_ibus_engine(), ibus_string, GBOOL_TRUE);
@@ -87,17 +87,21 @@ impl EngineCore {
             }
         }
 
+        if self.symbol_preedit.is_empty() {
+            return GBOOL_TRUE;
+        }
 
         let search_result  = PREDICTOR.symbol(self.symbol_preedit.as_str());
         match search_result {
             Ok(candidates) => {
+                log::info!("Symbol search for {} and got {:?}", self.symbol_preedit, candidates);
                 let table = self.get_table();
                 ibus_lookup_table_clear(table);
                 for (idx, (ident, shortcode)) in candidates.into_iter().enumerate() {
                     match (into_ibus_string(ident), into_ibus_string(shortcode)) {
                         (Ok(ident_ibus_string), Ok(shortcode_ibus_string)) => {
                             ibus_lookup_table_append_candidate(table, shortcode_ibus_string);
-                            ibus_lookup_table_append_label(table, ident_ibus_string);
+                            ibus_lookup_table_set_label(table, idx as guint,ident_ibus_string);
                         }
                         _ => {
                             log::error!("Failed string conversion for symbol lookup");
@@ -180,8 +184,7 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
         return GBOOL_FALSE;
     }
 
-    if (modifiers & IBusModifierType_IBUS_CONTROL_MASK) == IBusModifierType_IBUS_CONTROL_MASK
-        && keyval == IBUS_s {
+    if (modifiers & IBusModifierType_IBUS_CONTROL_MASK) == IBusModifierType_IBUS_CONTROL_MASK && keyval == IBUS_e {
         log::info!("enable symbol input");
         return engine_core.symbol_input_enable();
     }
@@ -192,7 +195,6 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
             if engine_core.symbol_input {
                 return engine_core.symbol_input_disable();
             }
-            //TODO: reset word buffer in normal typing
             GBOOL_TRUE
         }
         IBUS_Return => {
@@ -221,11 +223,43 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
                 GBOOL_FALSE
             }
         }
-        IBUS_space..=IBUS_asciitilde => {
+        IBUS_BackSpace => {
             if engine_core.symbol_input {
-                return engine_core.symbol_input_char(keyval);
+                engine_core.symbol_preedit.pop();
+                return engine_core.symbol_input_update();
+            }
+            GBOOL_FALSE
+        }
+        IBUS_Page_Down => {
+            if engine_core.lookup_visible {
+                log::info!("pageup");
+                let res = ibus_lookup_table_page_down(engine_core.get_table());
+                ibus_engine_update_lookup_table(engine_core.parent_engine_as_ibus_engine(), engine_core.get_table(), GBOOL_TRUE);
+                return res
+            }
+            GBOOL_FALSE
+        }
+        IBUS_Page_Up => {
+            if engine_core.lookup_visible {
+                log::info!("pagedown");
+                let res = ibus_lookup_table_page_up(engine_core.get_table());
+                ibus_engine_update_lookup_table(engine_core.parent_engine_as_ibus_engine(), engine_core.get_table(), GBOOL_TRUE);
+                return res
+            }
+            GBOOL_FALSE
+        }
+        IBUS_Escape => {
+            if engine_core.symbol_input {
+                return engine_core.symbol_input_disable();
+            }
+            GBOOL_FALSE
+        }
+        IBUS_space..=IBUS_asciitilde => {
+            return if engine_core.symbol_input {
+                engine_core.symbol_preedit.push((keyval as u8) as char);
+                engine_core.symbol_input_update()
             } else {
-                return engine_core.commit_char(keyval);
+                engine_core.commit_char(keyval)
             }
         }
         _ => GBOOL_FALSE
