@@ -97,9 +97,9 @@ impl EngineCore {
                 log::info!("Symbol search for {} and got {:?}", self.symbol_preedit, candidates);
                 let table = self.get_table();
                 ibus_lookup_table_clear(table);
-                for (idx, (ident, shortcode)) in candidates.into_iter().enumerate() {
-                    match (into_ibus_string(ident), into_ibus_string(shortcode)) {
-                        (Ok(ident_ibus_string), Ok(shortcode_ibus_string)) => {
+                for (idx, (shortcode, ident)) in candidates.into_iter().enumerate() {
+                    match (into_ibus_string(shortcode), into_ibus_string(ident)) {
+                        (Ok(shortcode_ibus_string), Ok(ident_ibus_string)) => {
                             ibus_lookup_table_append_candidate(table, shortcode_ibus_string);
                             ibus_lookup_table_set_label(table, idx as guint,ident_ibus_string);
                         }
