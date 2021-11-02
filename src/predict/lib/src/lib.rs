@@ -12,7 +12,8 @@ use log4rs::config::{Appender, Config, Root};
 use crate::predict::PredictionError::{FailedStringConversion, FstError, LevenshteinError, MissingSymbol};
 use crate::predict::PredictionError;
 use crate::predict::PREDICTOR;
-use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_RELEASE_MASK, IBusModifierType_IBUS_CONTROL_MASK, IBUS_e, IBUS_asciitilde, IBUS_space, IBUS_Return, IBUS_BackSpace, IBUS_Escape, IBUS_Page_Down, IBUS_Page_Up, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_lookup_table_append_label, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, IBUS_Left, IBUS_Right, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down, ibus_engine_hide_auxiliary_text, ibus_lookup_table_set_label, ibus_lookup_table_page_down, ibus_lookup_table_page_up};
+use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_RELEASE_MASK, IBusModifierType_IBUS_CONTROL_MASK, IBUS_e, IBUS_asciitilde, IBUS_space, IBUS_Return, IBUS_BackSpace, IBUS_Escape, IBUS_Page_Down, IBUS_Page_Up, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_lookup_table_append_label, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, IBUS_Left, IBUS_Right, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down, ibus_engine_hide_auxiliary_text, ibus_lookup_table_set_label, ibus_lookup_table_page_down, ibus_lookup_table_page_up, ibus_lookup_table_get_number_of_candidates, ibus_text_new_from_static_string, ibus_engine_show_lookup_table, ibus_lookup_table_get_cursor_in_page};
+use std::cmp::min;
 
 
 pub struct EngineCore {
@@ -21,7 +22,23 @@ pub struct EngineCore {
     cursor_pos: i32,
     symbol_input: bool,
     symbol_preedit: String,
+    symbol_label_vec: Vec<CString>,
+    symbol_last_page: guint,
     parent_engine: *mut IBusEEIEngine
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn new_engine_core(parent_engine: *mut IBusEEIEngine) -> *mut EngineCore {
+    Box::into_raw(Box::new(EngineCore {
+        lookup_visible: false,
+        word_buffer: String::new(),
+        cursor_pos: 0,
+        symbol_input: false,
+        symbol_preedit: String::new(),
+        symbol_label_vec: Vec::new(),
+        symbol_last_page: 0,
+        parent_engine: parent_engine
+    }))
 }
 
 unsafe fn into_ibus_string(input: String) -> Result<*mut IBusText, NulError> {
@@ -42,7 +59,20 @@ impl EngineCore {
         ((*(engine as *mut IBusEEIEngine)).engine_core as *mut EngineCore).as_mut()
     }
 
-
+    unsafe fn update_lookup_table(&mut self) {
+        if self.symbol_input {
+            let page_size = (*self.get_table()).page_size;
+            let idx = ibus_lookup_table_get_cursor_pos(self.get_table());
+            let page_num = idx / page_size;
+            if self.symbol_last_page != page_num {
+                self.symbol_last_page = page_num;
+                for (idx, table_idx) in (page_num * page_size..min((page_size * (page_size+1)), self.symbol_label_vec.len() as u32)).enumerate() {
+                    ibus_lookup_table_set_label(self.get_table(), idx as guint, ibus_text_new_from_static_string(self.symbol_label_vec.get_unchecked(table_idx as usize).as_ptr()))
+                }
+            }
+        }
+        ibus_engine_update_lookup_table(self.parent_engine_as_ibus_engine(), self.get_table(), GBOOL_TRUE);
+    }
 
     unsafe fn symbol_input_enable(&mut self) -> gboolean {
         if self.symbol_input {
@@ -51,9 +81,7 @@ impl EngineCore {
 
         self.symbol_input = true;
         self.lookup_visible = true;
-        // ibus_lookup_table_clear((*self.parent_engine).table);
-        // ibus_engine_show_lookup_table(engine as *mut IBusEngine);
-        ibus_engine_update_lookup_table(self.parent_engine as *mut IBusEngine, (*self.parent_engine).table, GBOOL_TRUE);
+        ibus_engine_show_lookup_table(self.parent_engine_as_ibus_engine());
         GBOOL_TRUE
     }
 
@@ -96,18 +124,25 @@ impl EngineCore {
             Ok(candidates) => {
                 log::info!("Symbol search for {} and got {:?}", self.symbol_preedit, candidates);
                 let table = self.get_table();
+                // Must clear table first, since the table may have IBusText referencing the
+                // symbol_label_vec strings
                 ibus_lookup_table_clear(table);
+                self.symbol_label_vec.clear();
                 for (idx, (shortcode, ident)) in candidates.into_iter().enumerate() {
-                    match (into_ibus_string(shortcode), into_ibus_string(ident)) {
-                        (Ok(shortcode_ibus_string), Ok(ident_ibus_string)) => {
-                            ibus_lookup_table_append_candidate(table, shortcode_ibus_string);
-                            ibus_lookup_table_set_label(table, idx as guint,ident_ibus_string);
+                    match (CString::new(shortcode.into_bytes()),  CString::new(ident.into_bytes())) {
+                        (Ok(shortcode_cstring), Ok(ident_cstring)) => {
+                            ibus_lookup_table_append_candidate(table, ibus_text_new_from_string(shortcode_cstring.into_raw() as *mut gchar));
+                            self.symbol_label_vec.push(ident_cstring);
+                            if idx < (*table).page_size as usize {
+                                ibus_lookup_table_set_label(table, idx as guint, ibus_text_new_from_static_string(self.symbol_label_vec.get_unchecked(idx).as_ptr()));
+                            }
                         }
                         _ => {
                             log::error!("Failed string conversion for symbol lookup");
                         }
                     }
                 }
+                log::info!("{} candidates and {} labels", ibus_lookup_table_get_number_of_candidates(self.get_table()), (*(*self.get_table()).labels).len);
                 ibus_engine_update_lookup_table(self.parent_engine_as_ibus_engine(), table, GBOOL_TRUE);
             },
             Err(err) => {
@@ -125,7 +160,7 @@ impl EngineCore {
             return GBOOL_FALSE;
         }
 
-        let idx = ibus_lookup_table_get_cursor_pos(self.get_table());
+        let idx = ibus_lookup_table_get_cursor_in_page(self.get_table());
         let symbol = ibus_lookup_table_get_label(self.get_table(), idx);
         ibus_engine_commit_text(self.parent_engine as *mut IBusEngine, symbol);
 
@@ -133,17 +168,7 @@ impl EngineCore {
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn new_engine_core(parent_engine: *mut IBusEEIEngine) -> *mut EngineCore {
-    Box::into_raw(Box::new(EngineCore {
-        lookup_visible: false,
-        word_buffer: String::new(),
-        cursor_pos: 0,
-        symbol_input: false,
-        symbol_preedit: String::new(),
-        parent_engine: parent_engine
-    }))
-}
+
 
 #[no_mangle]
 pub unsafe extern "C" fn free_engine_core(engine_state: *mut EngineCore) {
@@ -208,7 +233,7 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
         IBUS_Up => {
             if engine_core.lookup_visible {
                 ibus_lookup_table_cursor_up(engine_core.get_table());
-                ibus_engine_update_lookup_table(engine_core.parent_engine_as_ibus_engine(), engine_core.get_table(), GBOOL_TRUE);
+                engine_core.update_lookup_table();
                 GBOOL_TRUE
             } else {
                 GBOOL_FALSE
@@ -217,7 +242,7 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
         IBUS_Down => {
             if engine_core.lookup_visible {
                 ibus_lookup_table_cursor_down(engine_core.get_table());
-                ibus_engine_update_lookup_table(engine_core.parent_engine_as_ibus_engine(), engine_core.get_table(), GBOOL_TRUE);
+                engine_core.update_lookup_table();
                 GBOOL_TRUE
             } else {
                 GBOOL_FALSE
@@ -234,7 +259,7 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
             if engine_core.lookup_visible {
                 log::info!("pageup");
                 let res = ibus_lookup_table_page_down(engine_core.get_table());
-                ibus_engine_update_lookup_table(engine_core.parent_engine_as_ibus_engine(), engine_core.get_table(), GBOOL_TRUE);
+                engine_core.update_lookup_table();
                 return res
             }
             GBOOL_FALSE
@@ -243,7 +268,7 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
             if engine_core.lookup_visible {
                 log::info!("pagedown");
                 let res = ibus_lookup_table_page_up(engine_core.get_table());
-                ibus_engine_update_lookup_table(engine_core.parent_engine_as_ibus_engine(), engine_core.get_table(), GBOOL_TRUE);
+                engine_core.update_lookup_table();
                 return res
             }
             GBOOL_FALSE
