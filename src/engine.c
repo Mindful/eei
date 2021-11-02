@@ -18,7 +18,6 @@ static gboolean can_get_surrounding_text(IBusEEIEngine *eei)
     return eei->parent.client_capabilities & IBUS_CAP_SURROUNDING_TEXT;
 }
 
-
 static void
 ibus_eei_engine_class_init (IBusEEIEngineClass *klass)
 {

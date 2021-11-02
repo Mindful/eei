@@ -3,6 +3,7 @@ use fst::automaton::{Automaton, Str};
 use lazy_static::lazy_static;
 use crate::predict::PredictionError::*;
 use std::str::Utf8Error;
+use std::fmt;
 
 pub struct Predictor {
     dictionary: Map<Vec<u8>>,
@@ -18,13 +19,13 @@ pub enum PredictionError {
     FailedStringConversion(Utf8Error)
 }
 
-impl PredictionError {
-    pub fn error_message(&self) -> String {
+impl fmt::Display for PredictionError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            FstError(err) => format!("FST error: {}", err),
-            LevenshteinError(err) => format!("Levenshtein error: {}", err),
-            MissingSymbol(sym, codepoint) => format!("Missing shortcode: {}, for codepoint {}", sym, codepoint),
-            FailedStringConversion(err) => format!("String conversion error: {}", err)
+            FstError(err) => write!(f, "FST error: {}", err),
+            LevenshteinError(err) => write!(f, "Levenshtein error: {}", err),
+            MissingSymbol(sym, codepoint) => write!(f, "Missing shortcode: {}, for codepoint {}", sym, codepoint),
+            FailedStringConversion(err) => write!(f, "String conversion error: {}", err)
         }
     }
 }

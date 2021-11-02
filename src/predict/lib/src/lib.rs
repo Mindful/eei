@@ -1,6 +1,6 @@
 mod predict;
 
-use std::ffi::{CString, CStr};
+use std::ffi::{CString, CStr, NulError};
 use std::os::raw::{c_char, c_int};
 use std::mem;
 use log::LevelFilter;
@@ -11,7 +11,8 @@ use log4rs::config::{Appender, Config, Root};
 use crate::predict::PredictionError::{FailedStringConversion, FstError, LevenshteinError, MissingSymbol};
 use crate::predict::PredictionError;
 use crate::predict::PREDICTOR;
-use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_RELEASE_MASK, IBusModifierType_IBUS_CONTROL_MASK, IBUS_s, IBUS_asciitilde, IBUS_space, IBUS_Return, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar};
+use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_RELEASE_MASK, IBusModifierType_IBUS_CONTROL_MASK, IBUS_s, IBUS_asciitilde, IBUS_space, IBUS_Return, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_lookup_table_append_label, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, IBUS_Left, IBUS_Right, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down};
+
 
 pub struct EngineCore {
     lookup_visible: bool,
@@ -19,73 +20,112 @@ pub struct EngineCore {
     cursor_pos: i32,
     symbol_input: bool,
     symbol_preedit: String,
-    preedit_cursor_pos: i32,
     parent_engine: *mut IBusEEIEngine
 }
 
+unsafe fn into_ibus_string(input: String) -> Result<*mut IBusText, NulError> {
+    CString::new(input.into_bytes()).map(|cstr| ibus_text_new_from_string(cstr.into_raw() as *const gchar))
+}
 
 impl EngineCore {
-    fn symbol_input_enable(&mut self) -> gboolean {
+    fn parent_engine_as_ibus_engine(&self) -> *mut IBusEngine {
+        self.parent_engine as *mut IBusEngine
+    }
+
+    unsafe fn get_table(&self) -> *mut IBusLookupTable {
+        (*self.parent_engine).table
+    }
+
+    unsafe fn get(engine: *mut IBusEngine) -> Option<&'static mut EngineCore> {
+        ((*(engine as *mut IBusEEIEngine)).engine_core as *mut EngineCore).as_mut()
+    }
+
+
+
+    unsafe fn symbol_input_enable(&mut self) -> gboolean {
         if self.symbol_input {
             return GBOOL_FALSE;
         }
 
         self.symbol_input = true;
-        unsafe {
-            // ibus_lookup_table_clear((*self.parent_engine).table);
-            // ibus_engine_show_lookup_table(engine as *mut IBusEngine);
-            ibus_engine_update_lookup_table(self.parent_engine as *mut IBusEngine, (*self.parent_engine).table, GBOOL_TRUE);
-        }
+        // ibus_lookup_table_clear((*self.parent_engine).table);
+        // ibus_engine_show_lookup_table(engine as *mut IBusEngine);
+        ibus_engine_update_lookup_table(self.parent_engine as *mut IBusEngine, (*self.parent_engine).table, GBOOL_TRUE);
         GBOOL_TRUE
     }
 
-    fn symbol_input_disable(&mut self) -> gboolean {
+    unsafe fn symbol_input_disable(&mut self) -> gboolean {
         if !self.symbol_input {
             return GBOOL_FALSE;
         }
 
         self.symbol_input = false;
         self.symbol_preedit.clear();
-        unsafe {
-            ibus_engine_hide_lookup_table(self.parent_engine as *mut IBusEngine)
-        }
+        ibus_engine_hide_lookup_table(self.parent_engine as *mut IBusEngine);
         GBOOL_TRUE
     }
 
-    fn symbol_input_char(&mut self, character: char) -> gboolean {
+    unsafe fn commit_char(&mut self, keyval: guint) -> gboolean {
+        self.word_buffer.push((keyval as u8) as char);
+        ibus_engine_commit_text(self.parent_engine_as_ibus_engine(), ibus_text_new_from_string(&(keyval as gchar)));
+        GBOOL_TRUE
+    }
+
+    unsafe fn symbol_input_char(&mut self, keyval: guint) -> gboolean {
         if !self.symbol_input {
             log::error!("Symbol input char called outside symbol input mode");
             return GBOOL_FALSE;
         }
 
-        //TODO: append char, display preedit, run search and update aux text/search results
+        self.symbol_preedit.push((keyval as u8) as char);
+        match into_ibus_string(self.symbol_preedit.clone()) {
+            Ok(ibus_string) => {
+                ibus_engine_update_auxiliary_text(self.parent_engine_as_ibus_engine(), ibus_string, GBOOL_TRUE);
+            }
+            Err(err) => {
+                log::error!("Failed string conversion for symbol aux text update");
+            }
+        }
+
+
+        let search_result  = PREDICTOR.symbol(self.symbol_preedit.as_str());
+        match search_result {
+            Ok(candidates) => {
+                let table = self.get_table();
+                ibus_lookup_table_clear(table);
+                for (idx, (ident, shortcode)) in candidates.into_iter().enumerate() {
+                    match (into_ibus_string(ident), into_ibus_string(shortcode)) {
+                        (Ok(ident_ibus_string), Ok(shortcode_ibus_string)) => {
+                            ibus_lookup_table_append_candidate(table, shortcode_ibus_string);
+                            ibus_lookup_table_append_label(table, ident_ibus_string);
+                        }
+                        _ => {
+                            log::error!("Failed string conversion for symbol lookup");
+                        }
+                    }
+                }
+                ibus_engine_update_lookup_table(self.parent_engine_as_ibus_engine(), table, GBOOL_TRUE);
+            },
+            Err(err) => {
+                log::error!("{}", err);
+                return GBOOL_FALSE;
+            }
+        }
 
         GBOOL_TRUE
     }
 
-    fn symbol_input_commit(&mut self) -> gboolean {
+    unsafe fn symbol_input_commit(&mut self) -> gboolean {
         if !self.symbol_input {
             log::error!("Symbol input commit called outside symbol input mode");
             return GBOOL_FALSE;
         }
 
-        //TODO: this impl is wrong - don't commit the preedit string, get the current index of selection
-        //and then commit the symbol at that index
+        let idx = ibus_lookup_table_get_cursor_pos(self.get_table());
+        let symbol = ibus_lookup_table_get_label(self.get_table(), idx);
+        ibus_engine_commit_text(self.parent_engine as *mut IBusEngine, symbol);
 
-        let converted_text = CString::new(self.symbol_preedit.as_bytes()).map(|cstr| cstr.into_raw() as *const gchar);
-        let result = match converted_text {
-            Ok(gchar_pointer) => unsafe {
-                ibus_engine_commit_text(self.parent_engine as *mut IBusEngine, ibus_text_new_from_string(gchar_pointer));
-                GBOOL_TRUE
-            }
-            Err(error) => {
-                log::error!("Error comitting symbol: {}", error);
-                GBOOL_FALSE
-            }
-        };
-
-        self.symbol_input_disable();
-        result
+        self.symbol_input_disable()
     }
 }
 
@@ -97,7 +137,6 @@ pub unsafe extern "C" fn new_engine_core(parent_engine: *mut IBusEEIEngine) -> *
         cursor_pos: 0,
         symbol_input: false,
         symbol_preedit: String::new(),
-        preedit_cursor_pos: 0,
         parent_engine: parent_engine
     }))
 }
@@ -120,16 +159,14 @@ pub struct SymbolPredictions {
     shortcodes: *mut *mut c_char
 }
 
-unsafe fn get_engine_core(engine: *mut IBusEngine) -> Option<&'static mut EngineCore> {
-    ((*(engine as *mut IBusEEIEngine)).engine_core as *mut EngineCore).as_mut()
-}
-
 
 #[no_mangle]
 pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngine, keyval: guint,
-    keycode: guint, modifiers: guint, ) -> gboolean {
+    keycode: guint, modifiers: guint) -> gboolean {
 
-    let engine_core = match get_engine_core(engine) {
+    log::info!("Process key {}", keyval);
+
+    let engine_core = match EngineCore::get(engine) {
         Some(engine_ref) => engine_ref,
         None => {
             log::error!("Could not retrieve engine core");
@@ -139,11 +176,13 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
 
 
     if (modifiers & IBusModifierType_IBUS_RELEASE_MASK) != 0 {
+        log::info!("release");
         return GBOOL_FALSE;
     }
 
     if (modifiers & IBusModifierType_IBUS_CONTROL_MASK) == IBusModifierType_IBUS_CONTROL_MASK
         && keyval == IBUS_s {
+        log::info!("enable symbol input");
         return engine_core.symbol_input_enable();
     }
 
@@ -158,15 +197,36 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
         }
         IBUS_Return => {
             if engine_core.symbol_input {
-                //TODO: commit symbol input
+                return engine_core.symbol_input_commit();
             }
             //TODO: if we are selecting words or in emoji mode, commit our current selection
             //otherwise reset word buffer
             GBOOL_TRUE
         }
+        IBUS_Up => {
+            if engine_core.lookup_visible {
+                ibus_lookup_table_cursor_up(engine_core.get_table());
+                ibus_engine_update_lookup_table(engine_core.parent_engine_as_ibus_engine(), engine_core.get_table(), GBOOL_TRUE);
+                GBOOL_TRUE
+            } else {
+                GBOOL_FALSE
+            }
+        }
+        IBUS_Down => {
+            if engine_core.lookup_visible {
+                ibus_lookup_table_cursor_down(engine_core.get_table());
+                ibus_engine_update_lookup_table(engine_core.parent_engine_as_ibus_engine(), engine_core.get_table(), GBOOL_TRUE);
+                GBOOL_TRUE
+            } else {
+                GBOOL_FALSE
+            }
+        }
         IBUS_space..=IBUS_asciitilde => {
-            //TODO: add this char to the buffer or emoji editing
-            GBOOL_TRUE
+            if engine_core.symbol_input {
+                return engine_core.symbol_input_char(keyval);
+            } else {
+                return engine_core.commit_char(keyval);
+            }
         }
         _ => GBOOL_FALSE
     }
