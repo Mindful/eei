@@ -12,7 +12,7 @@ use log4rs::config::{Appender, Config, Root};
 use crate::predict::PredictionError::{FailedStringConversion, FstError, LevenshteinError, MissingSymbol};
 use crate::predict::PredictionError;
 use crate::predict::PREDICTOR;
-use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_RELEASE_MASK, IBusModifierType_IBUS_CONTROL_MASK, IBUS_e, IBUS_asciitilde, IBUS_space, IBUS_Return, IBUS_BackSpace, IBUS_Escape, IBUS_Page_Down, IBUS_Page_Up, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_lookup_table_append_label, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, IBUS_Left, IBUS_Right, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down, ibus_engine_hide_auxiliary_text, ibus_lookup_table_set_label, ibus_lookup_table_page_down, ibus_lookup_table_page_up, ibus_lookup_table_get_number_of_candidates, ibus_text_new_from_static_string, ibus_engine_show_lookup_table, ibus_lookup_table_get_cursor_in_page};
+use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_RELEASE_MASK, IBusModifierType_IBUS_CONTROL_MASK, IBUS_e, IBUS_asciitilde, IBUS_space, IBUS_Return, IBUS_BackSpace, IBUS_Escape, IBUS_Page_Down, IBUS_Page_Up, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_lookup_table_append_label, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, IBUS_Left, IBUS_Right, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down, ibus_engine_hide_auxiliary_text, ibus_lookup_table_set_label, ibus_lookup_table_page_down, ibus_lookup_table_page_up, ibus_lookup_table_get_number_of_candidates, ibus_text_new_from_static_string, ibus_engine_show_lookup_table, ibus_lookup_table_get_cursor_in_page, gunichar, IBusModifierType_IBUS_SHIFT_MASK};
 use std::cmp::min;
 
 
@@ -100,8 +100,7 @@ impl EngineCore {
 
     unsafe fn commit_char(&mut self, keyval: guint) -> gboolean {
         self.word_buffer.push((keyval as u8) as char);
-        log::info!("append {} and commit {}", keyval as u8, keyval as gchar);
-        ibus_engine_commit_text(self.parent_engine_as_ibus_engine(), ibus_text_new_from_string(&(keyval as gchar)));
+        ibus_engine_commit_text(self.parent_engine_as_ibus_engine(), ibus_text_new_from_unichar(keyval as gunichar));
         GBOOL_TRUE
     }
 
@@ -204,31 +203,28 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
     };
 
 
-    if (modifiers & IBusModifierType_IBUS_RELEASE_MASK) != 0 {
-        log::info!("release");
-        return GBOOL_FALSE;
-    }
-
     if (modifiers & IBusModifierType_IBUS_CONTROL_MASK) == IBusModifierType_IBUS_CONTROL_MASK && keyval == IBUS_e {
         log::info!("enable symbol input");
         return engine_core.symbol_input_enable();
+    } else if (modifiers & !IBusModifierType_IBUS_SHIFT_MASK) != 0 {
+        return GBOOL_FALSE; //This also covers released keys with IBUS_RELEASE_MASK
     }
 
     match keyval {
-        //TODO: handle other keyvals
         IBUS_space => {
+            //TODO: handle aborting words, not just symbols
             if engine_core.symbol_input {
-                return engine_core.symbol_input_disable();
+                engine_core.symbol_input_disable();
             }
-            GBOOL_TRUE
+            engine_core.commit_char(keyval)
         }
         IBUS_Return => {
+            //TODO also handle committing words, not just symbols
             if engine_core.symbol_input {
-                return engine_core.symbol_input_commit();
+                engine_core.symbol_input_commit()
+            } else {
+                engine_core.commit_char(keyval)
             }
-            //TODO: if we are selecting words or in emoji mode, commit our current selection
-            //otherwise reset word buffer
-            GBOOL_TRUE
         }
         IBUS_Up => {
             if engine_core.lookup_visible {
