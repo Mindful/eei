@@ -284,8 +284,6 @@ pub struct SymbolPredictions {
 pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngine, keyval: guint,
     keycode: guint, modifiers: guint) -> gboolean {
 
-    log::info!("Process key {}", keyval);
-
     let engine_core = match EngineCore::get(engine) {
         Some(engine_ref) => engine_ref,
         None => {
@@ -454,9 +452,15 @@ pub unsafe extern "C" fn configure_logging() {
         .encoder(Box::new(PatternEncoder::new("{l} - {m}\n")))
         .build("/home/josh/scrapbox/eei.log").unwrap();
 
+    let log_level = if cfg!(debug_assertions) {
+        LevelFilter::Info
+    } else {
+        LevelFilter::Warn
+    };
+
     let config = Config::builder()
         .appender(Appender::builder().build("logfile", Box::new(logfile)))
-        .build(Root::builder().appender("logfile").build(LevelFilter::Info)).unwrap();
+        .build(Root::builder().appender("logfile").build(log_level)).unwrap();
 
     log4rs::init_config(config).unwrap();
 

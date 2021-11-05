@@ -4,6 +4,12 @@ project (ibus-eei)
 cmake_policy(SET CMP0054 NEW)
 
 add_compile_options(-Werror)
+if (RELEASE EQUAL 1)
+    message("Producing release build files")
+    add_compile_options(-O3)
+else()
+    message("Producing debug build files")
+endif()
 
 
 set(LIBEXECDIR "${CMAKE_INSTALL_FULL_LIBEXECDIR}" CACHE STRING "where to install ibus-{engine,setup}-eei")

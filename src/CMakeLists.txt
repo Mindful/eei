@@ -2,12 +2,15 @@ find_package(PkgConfig)
 pkg_check_modules(IBUS REQUIRED ibus-1.0)
 
 # Rust requires PThreads
-#TODO: do we need to do this this way? can we just link pthreads below?
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 
-find_library(PREDICT src/predict/target/debug/libpredict.a) #TODO: links debug output only
+if (DEFINED RELEASE)
+    find_library(PREDICT src/predict/target/release/libpredict.a)
+else()
+    find_library(PREDICT src/predict/target/debug/libpredict.a)
+endif()
 
 add_executable(ibus-engine-eei
         main.c

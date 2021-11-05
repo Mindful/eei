@@ -3,12 +3,13 @@ https://github.com/phuang/ibus-tmpl and
 https://github.com/ibus/ibus/blob/master/src/ibusenginesimple.c
 
 ```shell
-./install.sh
+./test.sh
 ibus restart
 ibus engine eei
 ```
 
-press ctrl+s while typing to open the lookup table (currently)
+`ctrl+e` opens the emoji/symbol lookup table.
+`ctrl+w` while in the middle of typing a word opens autocomplete for that word.
 
 ## Generating dictionary data
 First, download the en_US hunspell dictionary data from http://wordlist.aspell.net/dicts/
