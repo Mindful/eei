@@ -12,15 +12,23 @@ use crate::predict::PREDICTOR;
 use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_CONTROL_MASK, IBUS_e, IBUS_w, IBUS_asciitilde, IBUS_space, IBUS_Return, IBUS_BackSpace, IBUS_Escape, IBUS_Page_Down, IBUS_Page_Up, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down, ibus_engine_hide_auxiliary_text, ibus_lookup_table_set_label, ibus_lookup_table_page_down, ibus_lookup_table_page_up, ibus_lookup_table_get_number_of_candidates, ibus_text_new_from_static_string, ibus_engine_show_lookup_table, ibus_lookup_table_get_cursor_in_page, gunichar, IBusModifierType_IBUS_SHIFT_MASK, ibus_lookup_table_get_candidate};
 use std::cmp::min;
 use lazy_static::lazy_static;
+use InputMode::*;
 
 lazy_static! {
     static ref empty_cstring: CString = CString::new("").unwrap();
 }
 
+#[derive(PartialEq)]
+enum InputMode {
+    Normal,
+    SymbolTable,
+    WordTable
+}
+
 pub struct EngineCore {
-    lookup_visible: bool,
+    table_visible: bool,
     word_buffer: String,
-    symbol_input: bool,
+    input_mode: InputMode,
     symbol_preedit: String,
     symbol_label_vec: Vec<CString>,
     symbol_last_page: guint,
@@ -30,9 +38,9 @@ pub struct EngineCore {
 #[no_mangle]
 pub unsafe extern "C" fn new_engine_core(parent_engine: *mut IBusEEIEngine) -> *mut EngineCore {
     Box::into_raw(Box::new(EngineCore {
-        lookup_visible: false,
+        table_visible: false,
         word_buffer: String::new(),
-        symbol_input: false,
+        input_mode: InputMode::Normal,
         symbol_preedit: String::new(),
         symbol_label_vec: Vec::new(),
         symbol_last_page: 0,
@@ -59,7 +67,7 @@ impl EngineCore {
     }
 
     unsafe fn update_lookup_table(&mut self) {
-        if self.symbol_input {
+        if self.input_mode == SymbolTable {
             let page_size = (*self.get_table()).page_size;
             let idx = ibus_lookup_table_get_cursor_pos(self.get_table());
             let page_num = idx / page_size;
@@ -74,7 +82,7 @@ impl EngineCore {
     }
 
     unsafe fn word_table_update(&mut self) -> gboolean {
-        if !self.lookup_visible || self.symbol_input {
+        if !self.table_visible || self.input_mode == SymbolTable {
             return GBOOL_FALSE;
         }
         else if self.word_buffer.is_empty() {
@@ -108,46 +116,45 @@ impl EngineCore {
     }
 
     unsafe fn word_table_enable(&mut self) -> gboolean {
-        if self.lookup_visible || self.word_buffer.is_empty() {
+        if self.table_visible || self.word_buffer.is_empty() {
             return GBOOL_FALSE;
         }
 
-        self.lookup_visible = true;
-        let ret = self.word_table_update();
-        ibus_lookup_table_clear(self.get_table());
-        ibus_engine_show_lookup_table(self.parent_engine_as_ibus_engine());
-        ret
+        self.input_mode = WordTable;
+        self.table_visible = true;
+        self.word_table_update()
     }
 
     unsafe fn word_table_disable(&mut self) -> gboolean {
-        if !self.lookup_visible {
+        if !self.table_visible {
             return GBOOL_FALSE;
         }
 
-        self.lookup_visible = false;
+        self.input_mode = Normal;
+        self.table_visible = false;
         ibus_engine_hide_lookup_table(self.parent_engine_as_ibus_engine());
         GBOOL_TRUE
     }
 
-    unsafe fn symbol_input_enable(&mut self) -> gboolean {
-        if self.lookup_visible {
+    unsafe fn symbol_table_enable(&mut self) -> gboolean {
+        if self.table_visible {
             return GBOOL_FALSE;
         }
 
-        self.symbol_input = true;
-        self.lookup_visible = true;
+        self.input_mode = SymbolTable;
+        self.table_visible = true;
         ibus_lookup_table_clear(self.get_table());
-        ibus_engine_show_lookup_table(self.parent_engine_as_ibus_engine());
+        ibus_engine_update_lookup_table(self.parent_engine_as_ibus_engine(), self.get_table(), GBOOL_TRUE);
         GBOOL_TRUE
     }
 
-    unsafe fn symbol_input_disable(&mut self) -> gboolean {
-        if !self.symbol_input {
+    unsafe fn symbol_table_disable(&mut self) -> gboolean {
+        if self.input_mode != SymbolTable {
             return GBOOL_FALSE;
         }
 
-        self.symbol_input = false;
-        self.lookup_visible = false;
+        self.input_mode = Normal;
+        self.table_visible = false;
         self.symbol_preedit.clear();
         ibus_engine_hide_lookup_table(self.parent_engine_as_ibus_engine());
         ibus_engine_hide_auxiliary_text(self.parent_engine_as_ibus_engine());
@@ -157,10 +164,9 @@ impl EngineCore {
         GBOOL_TRUE
     }
 
-    unsafe fn commit_char(&mut self, keyval: guint) -> gboolean {
+    unsafe fn commit_char(&mut self, keyval: guint) {
         self.word_buffer.push((keyval as u8) as char);
         ibus_engine_commit_text(self.parent_engine_as_ibus_engine(), ibus_text_new_from_unichar(keyval as gunichar));
-        GBOOL_TRUE
     }
 
     unsafe fn symbol_input_update(&mut self) -> gboolean {
@@ -213,11 +219,11 @@ impl EngineCore {
     }
 
     unsafe fn word_commit(&mut self) -> gboolean {
-        if !self.lookup_visible || self.symbol_input {
+        if !self.table_visible || self.input_mode == SymbolTable {
             return GBOOL_FALSE;
         }
 
-        let idx = ibus_lookup_table_get_cursor_in_page(self.get_table());
+        let idx = ibus_lookup_table_get_cursor_pos(self.get_table());
         let candidate = ibus_lookup_table_get_candidate(self.get_table(), idx);
         match CStr::from_ptr((*candidate).text as *const c_char).to_str() {
             Ok(word) => {
@@ -239,8 +245,8 @@ impl EngineCore {
         self.word_table_disable()
     }
 
-    unsafe fn symbol_input_commit(&mut self) -> gboolean {
-        if !self.symbol_input {
+    unsafe fn symbol_commit(&mut self) -> gboolean {
+        if self.input_mode != SymbolTable {
             log::error!("Symbol input commit called outside symbol input mode");
             return GBOOL_FALSE;
         }
@@ -249,7 +255,7 @@ impl EngineCore {
         let symbol = ibus_lookup_table_get_label(self.get_table(), idx);
         ibus_engine_commit_text(self.parent_engine_as_ibus_engine(), symbol);
 
-        self.symbol_input_disable()
+        self.symbol_table_disable()
     }
 }
 
@@ -289,14 +295,34 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
     };
 
 
-    if (modifiers & IBusModifierType_IBUS_CONTROL_MASK) == IBusModifierType_IBUS_CONTROL_MASK {
+    if modifiers == IBusModifierType_IBUS_CONTROL_MASK {
         //control key (and only control key) is held down
         return match keyval {
             IBUS_e => {
-                engine_core.symbol_input_enable()
+                match engine_core.input_mode {
+                    SymbolTable => {
+                        engine_core.symbol_table_disable()
+                    }
+                    WordTable => {
+                        GBOOL_TRUE
+                    }
+                    Normal => {
+                        engine_core.symbol_table_enable()
+                    }
+                }
             }
             IBUS_w => {
-                engine_core.word_table_enable()
+                match engine_core.input_mode {
+                    SymbolTable => {
+                        GBOOL_TRUE
+                    }
+                    WordTable => {
+                        engine_core.word_table_disable()
+                    }
+                    Normal => {
+                        engine_core.word_table_enable()
+                    }
+                }
             }
             _ => {
                 GBOOL_FALSE
@@ -308,90 +334,113 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
 
     match keyval {
         IBUS_space => {
-            if engine_core.symbol_input {
-                engine_core.symbol_input_disable();
-            } else if engine_core.lookup_visible {
-                engine_core.word_table_disable();
+            match engine_core.input_mode {
+                SymbolTable => {
+                    engine_core.symbol_table_disable();
+                },
+                WordTable => {
+                    engine_core.word_table_disable();
+                }
+                Normal => {}
             }
-            let ret = engine_core.commit_char(keyval);
+            engine_core.commit_char(keyval);
             engine_core.word_buffer.clear();
-            ret
+            GBOOL_TRUE
         }
         IBUS_Return => {
-            let ret = if engine_core.symbol_input {
-                engine_core.symbol_input_commit()
-            } else if engine_core.lookup_visible {
-                engine_core.word_commit()
-            } else {
-                engine_core.commit_char(keyval)
+            let ret = match engine_core.input_mode {
+                SymbolTable => {
+                    engine_core.symbol_commit()
+                }
+                WordTable => {
+                    engine_core.word_commit()
+                }
+                Normal => {
+                    GBOOL_FALSE
+                }
             };
             engine_core.word_buffer.clear();
             ret
         }
         IBUS_Up => {
-            if engine_core.lookup_visible {
-                ibus_lookup_table_cursor_up(engine_core.get_table());
+            if engine_core.table_visible {
+                let ret = ibus_lookup_table_cursor_up(engine_core.get_table());
                 engine_core.update_lookup_table();
-                GBOOL_TRUE
+                ret
             } else {
                 GBOOL_FALSE
             }
         }
         IBUS_Down => {
-            if engine_core.lookup_visible {
-                ibus_lookup_table_cursor_down(engine_core.get_table());
+            if engine_core.table_visible {
+                let ret = ibus_lookup_table_cursor_down(engine_core.get_table());
                 engine_core.update_lookup_table();
-                GBOOL_TRUE
+                ret
             } else {
                 GBOOL_FALSE
             }
         }
         IBUS_BackSpace => {
-            if engine_core.symbol_input {
-                engine_core.symbol_preedit.pop();
-                return engine_core.symbol_input_update();
-            } else {
-                if engine_core.lookup_visible {
+            match engine_core.input_mode {
+                SymbolTable => {
+                    engine_core.symbol_preedit.pop();
+                    engine_core.symbol_input_update()
+                }
+                WordTable => {
                     engine_core.word_buffer.pop();
                     engine_core.word_table_update();
+                    GBOOL_FALSE
+                }
+                Normal => {
+                    GBOOL_FALSE
                 }
             }
-            GBOOL_FALSE
         }
         IBUS_Page_Down => {
-            if engine_core.lookup_visible {
-                log::info!("pageup");
+            if engine_core.table_visible {
                 let res = ibus_lookup_table_page_down(engine_core.get_table());
                 engine_core.update_lookup_table();
                 return res
+            } else {
+                GBOOL_FALSE
             }
-            GBOOL_FALSE
         }
         IBUS_Page_Up => {
-            if engine_core.lookup_visible {
-                log::info!("pagedown");
+            if engine_core.table_visible {
                 let res = ibus_lookup_table_page_up(engine_core.get_table());
                 engine_core.update_lookup_table();
                 return res
+            } else {
+                GBOOL_FALSE
             }
-            GBOOL_FALSE
         }
         IBUS_Escape => {
-            if engine_core.symbol_input {
-                return engine_core.symbol_input_disable();
+            match engine_core.input_mode {
+                SymbolTable => {
+                    engine_core.symbol_table_disable()
+                }
+                WordTable => {
+                    engine_core.word_table_disable()
+                }
+                Normal => {
+                    GBOOL_FALSE
+                }
             }
-            GBOOL_FALSE
         }
         IBUS_space..=IBUS_asciitilde => {
-            return if engine_core.symbol_input {
-                engine_core.symbol_preedit.push((keyval as u8) as char);
-                engine_core.symbol_input_update()
-            } else {
-                let ret = engine_core.commit_char(keyval);
-                if engine_core.lookup_visible {
-                    engine_core.word_table_update();
+            match engine_core.input_mode {
+                SymbolTable => {
+                    engine_core.symbol_preedit.push((keyval as u8) as char);
+                    engine_core.symbol_input_update()
                 }
-                ret
+                WordTable => {
+                    engine_core.commit_char(keyval);
+                    engine_core.word_table_update()
+                }
+                Normal => {
+                    engine_core.commit_char(keyval);
+                    GBOOL_TRUE
+                }
             }
         }
         _ => GBOOL_FALSE

@@ -41,7 +41,6 @@ impl Predictor {
 
         search_results.sort_by(|(_w1, f1), (_w2, f2)| f2.cmp(f1));
         let final_results = search_results.into_iter().map(|(word, _freq)| {word}).take(10).collect();
-        log::info!("Predictions for {}: {:?}", context, final_results);
         Ok(final_results)
     }
 
