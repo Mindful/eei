@@ -13,6 +13,12 @@ use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table
 use std::cmp::min;
 use lazy_static::lazy_static;
 use InputMode::*;
+use std::path::Path;
+use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
+use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
+use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
+use log4rs::filter::threshold::ThresholdFilter;
+use log4rs::append::rolling_file::RollingFileAppender;
 
 lazy_static! {
     static ref empty_cstring: CString = CString::new("").unwrap();
@@ -446,25 +452,57 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
 }
 
 
+static DATA_DIRNAME: &str = "eei";
+
 #[no_mangle]
 pub unsafe extern "C" fn configure_logging() {
-    let logfile = FileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("{l} - {m}\n")))
-        .build("/home/josh/scrapbox/eei.log").unwrap();
+    //https://stackoverflow.com/questions/56345288/how-do-i-use-log4rs-rollingfileappender-to-incorporate-rolling-logging
 
-    let log_level = if cfg!(debug_assertions) {
-        LevelFilter::Info
-    } else {
-        LevelFilter::Warn
-    };
+    let log_location = std::env::var("XDG_DATA_HOME").map(|dir| Path::new(dir.as_str()).join(DATA_DIRNAME))
+        .or(std::env::var("HOME").map(|home| Path::new(home.as_str()).join(".local").join("share").join(DATA_DIRNAME)));
 
-    let config = Config::builder()
-        .appender(Appender::builder().build("logfile", Box::new(logfile)))
-        .build(Root::builder().appender("logfile").build(log_level)).unwrap();
+    match log_location {
+        Ok(location) => {
+            // https://stackoverflow.com/questions/56345288/how-do-i-use-log4rs-rollingfileappender-to-incorporate-rolling-logging
+            let window_size = 3; // log0, log1, log2
+            let fixed_window_roller = FixedWindowRoller::builder().build(location.join("log_archive_{}.txt").to_str().unwrap(), window_size).unwrap();
+            let size_limit = 1024 * 5; // 5KB as max size before roll
+            let size_trigger = SizeTrigger::new(size_limit);
+            let compound_policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(fixed_window_roller));
 
-    log4rs::init_config(config).unwrap();
+            let log_level = if cfg!(debug_assertions) {
+                LevelFilter::Debug
+            } else {
+                LevelFilter::Warn
+            };
 
-    log::info!("Logging initialized");
+            let config = Config::builder()
+                .appender(
+                    Appender::builder()
+                        .filter(Box::new(ThresholdFilter::new(log_level)))
+                        .build(
+                            "logfile",
+                            Box::new(
+                                RollingFileAppender::builder()
+                                    .encoder(Box::new(PatternEncoder::new("{d(%Y-%m-%d %H:%M:%S)} {l}::{m}{n}")))
+                                    .build(location.join("log.txt"), Box::new(compound_policy)).unwrap(),
+                            ),
+                        ),
+                )
+                .build(
+                    Root::builder()
+                        .appender("logfile")
+                        .build(LevelFilter::Debug),
+                ).unwrap();
+
+            log4rs::init_config(config).unwrap();
+
+            log::info!("Logging initialized");
+        }
+        Err(err) => {
+            println!("ERROR: COULD NOT INITIALIZE LOGGING: {}", err)
+        }
+    }
 }
 
 

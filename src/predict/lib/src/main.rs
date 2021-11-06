@@ -2,7 +2,6 @@ mod predict;
 
 use predict::PREDICTOR;
 
-
 fn main() {
     let word_pref = "lit";
 
