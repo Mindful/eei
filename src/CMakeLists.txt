@@ -5,12 +5,12 @@ pkg_check_modules(IBUS REQUIRED ibus-1.0)
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-
+# unset variable so we don't use the same cached value regardless of release type
 if (RELEASE EQUAL 1)
-    message("Using release prediction library")
+    unset(PREDICT CACHE)
     find_library(PREDICT src/predict/target/release/libpredict.a)
 else()
-    message("Using debug prediction library")
+    unset(PREDICT CACHE)
     find_library(PREDICT src/predict/target/debug/libpredict.a)
 endif()
 

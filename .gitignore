@@ -10,10 +10,7 @@ src/predict/target
 src/predict/ibus/src/ibus_bindings.rs
 .cmake
 
-dictionary.fst
 hunspell_US.txt
-shortcodes.fst
-symbols.bin
 count_1w.txt
 
 CMakeFiles/
