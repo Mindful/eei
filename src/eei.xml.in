@@ -3,7 +3,7 @@
 <component>
   <name>joshua.tanner.IBus.eei</name>
   <description>Extended english input</description>
-  <exec>${LIBEXECDIR}/debug.sh --ibus</exec>
+  <exec>${LIBEXECDIR}/ibus-engine-eei --ibus</exec>
   <version>@VERSION@</version>
   <author>Joshua Tanner</author>
   <license>GPL</license>
@@ -20,6 +20,7 @@
 			<longname>Extended English Input</longname>
 			<description>Extended English Input</description>
 			<rank>0</rank>
+			<symbol>E</symbol>
 		</engine>
 	</engines>
 

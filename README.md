@@ -3,7 +3,7 @@ https://github.com/phuang/ibus-tmpl and
 https://github.com/ibus/ibus/blob/master/src/ibusenginesimple.c
 
 ```shell
-./test.sh
+./test-install.sh
 ibus restart
 ibus engine eei
 ```

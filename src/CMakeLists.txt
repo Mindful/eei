@@ -6,7 +6,7 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 
-if (DEFINED RELEASE)
+if (RELEASE EQUAL 1)
     find_library(PREDICT src/predict/target/release/libpredict.a)
 else()
     find_library(PREDICT src/predict/target/debug/libpredict.a)

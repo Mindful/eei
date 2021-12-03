@@ -51,7 +51,7 @@ init (void)
                                         "0.1.0",
                                         "GPL",
                                         "Joshua Tanner <mindful.jt@gmail.com>",
-                                        "http://code.google.com/p/ibus/",
+                                        "https://github.com/Mindful/eei",
                                         "",
                                         "ibus-eei");
         ibus_component_add_engine (component,

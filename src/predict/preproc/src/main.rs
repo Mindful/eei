@@ -17,6 +17,10 @@ enum ParseError {
     InvalidWordFreq(String)
 }
 
+//code point;class;char;entity name;entity set;note/description;CHARACTER NAME
+
+
+
 impl Display for ParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
@@ -38,6 +42,29 @@ fn parse_github_emoji_url(url: &String) -> Result<String, ParseError> {
 
     bytecode_strings.map(|codepoint| parse_unicode(codepoint))
     .collect::<Result<Vec<_>, _>>().map(|char_vec|char_vec.into_iter().collect::<String>())
+}
+
+fn math_symbol_shortcodes() -> Vec<(String, String)> {
+    let whitelist = io::BufReader::new(File::open("math_whitelist.txt").unwrap())
+        .lines().collect::<Result<HashSet<String>, _>>().unwrap();
+
+    let reader = ureq::get("https://www.unicode.org/Public/math/revision-15/MathClassEx-15.txt").call()
+        .unwrap()
+        .into_reader();
+
+
+    let rdr = csv::ReaderBuilder::new()
+        .comment(Some(b'#'))
+        .delimiter(b';')
+        .has_headers(false)
+        .from_reader(reader);
+
+    rdr.into_records().filter_map(|result| {
+        result.ok().map(|record| {
+            let symbol = &record[2];
+            (String::from(&record[3]), String::from(symbol)) //shortcode, symbol
+        })
+    }).filter(|(shortcode, symbol)| {whitelist.contains(symbol)} ).collect()
 }
 
 fn github_emoji_shortcodes() -> Vec<(String, String)> {
@@ -139,11 +166,16 @@ fn process_dictionary() -> Result<(), Box<dyn error::Error>> {
 }
 
 fn main() -> Result<(), Box<dyn error::Error>>{
+    println!("Fetching math symbols");
+    let math_symbols = math_symbol_shortcodes();
+
     println!("Fetching shortcodes from github");
     let shortcodes = github_emoji_shortcodes();
 
+    let all_symbols = [math_symbols, shortcodes].concat();
+
     println!("Writing symbols and shortcodes to files");
-    write_symbols_and_shortcodes(shortcodes)?;
+    write_symbols_and_shortcodes(all_symbols)?;
     println!("Processing dictionary");
     process_dictionary()?;
 
