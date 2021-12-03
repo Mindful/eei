@@ -1,9 +1,28 @@
-Based off of https://github.com/vn-input/ibus-unikey, 
-https://github.com/phuang/ibus-tmpl and 
-https://github.com/ibus/ibus/blob/master/src/ibusenginesimple.c
+# Extended English Input
+
+Extended English Input (EEI) is an iBus input method that I wrote primarily for my personal use, because I was sick of
+having no good way to input emojis and math symbols into most applications. It's a little bit like a
+faster and _much_ smaller [iBus typing booster](https://github.com/mike-fabian/ibus-typing-booster).
+
+Documentation for iBus is pretty poor, so much of the code here is based off of
+the below repos:
+* [ibus-tmpl](https://github.com/phuang/ibus-tmpl)
+* [ibus-unikey](https://github.com/vn-input/ibus-unikey)
+* [ibusenginesimple](https://github.com/ibus/ibus/blob/master/src/ibusenginesimple.c)
+
+## Installation
+
+Assuming you are set up to compile both C and Rust, installation should be
+as simple as:
+```shell
+git clone git@github.com:Mindful/eei.git
+cd eei
+./install.sh
+```
+
+Then, to actually use your new input method:
 
 ```shell
-./test-install.sh
 ibus restart
 ibus engine eei
 ```
@@ -12,6 +31,9 @@ ibus engine eei
 `ctrl+w` while in the middle of typing a word opens autocomplete for that word.
 
 ## Generating dictionary data
+Binary dictionary data is included in the git repository, so this step is not 
+necessary unless you want to rebuild or modify the dictionary data. 
+
 First, download the en_US hunspell dictionary data from http://wordlist.aspell.net/dicts/
 ```shell
 sudo apt-get install hunspell-tools
@@ -19,7 +41,15 @@ unzip hunspell-en_US-2020.12.07.zip
 unmunch en_US.dic en_US.aff > hunspell_US.txt
 ```
 
-## Word frequency data
+Then get the word frequency data
 ```shell
 wget https://norvig.com/ngrams/count_1w.txt
 ```
+
+Finally, run the preprocessing script
+```shell
+cd src/predict
+cargo run --package preproc --bin preproc
+```
+
+This will generate `dictionary.fst`, `shortcodes.fst` and `symbols.bin`.
