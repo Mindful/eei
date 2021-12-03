@@ -7,8 +7,10 @@ find_package(Threads REQUIRED)
 
 
 if (RELEASE EQUAL 1)
+    message("Using release prediction library")
     find_library(PREDICT src/predict/target/release/libpredict.a)
 else()
+    message("Using debug prediction library")
     find_library(PREDICT src/predict/target/debug/libpredict.a)
 endif()
 

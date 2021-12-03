@@ -76,7 +76,13 @@ fn github_emoji_shortcodes() -> Vec<(String, String)> {
     //have to filter out bad URLs like
     // "https://github.githubassets.com/images/icons/emoji/bowtie.png?v8"
     json.iter().filter_map(|(key, url)| {
-            parse_github_emoji_url(url).map(|unicode_str| (key.clone(), unicode_str)).ok()
+            let key_chars: Vec<char> = key.chars().collect();
+            if key_chars.get(0).map(|c| c == &'u').unwrap_or(false) &&
+                key_chars.get(1).map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                None //filter out "u5272" etc. for Japanese emoji
+            } else {
+                parse_github_emoji_url(url).map(|unicode_str| (key.clone(), unicode_str)).ok()
+            }
     }).collect::<Vec<(String, String)>>()
 }
 
