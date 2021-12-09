@@ -1,14 +1,11 @@
 # Extended English Input
 
-Extended English Input (EEI) is an iBus input method that I wrote primarily for my personal use, because I was sick of
+Extended English Input (EEI) is an IBus input method that I wrote primarily for my personal use, because I was sick of
 having no good way to input emojis and math symbols into most applications. It's a little bit like a
-faster and _much_ smaller [iBus typing booster](https://github.com/mike-fabian/ibus-typing-booster).
+faster and _much_ smaller [IBus typing booster](https://github.com/mike-fabian/ibus-typing-booster)
+that does way less.
 
-Documentation for iBus is pretty poor, so much of the code here is based off of
-the below repos:
-* [ibus-tmpl](https://github.com/phuang/ibus-tmpl)
-* [ibus-unikey](https://github.com/vn-input/ibus-unikey)
-* [ibusenginesimple](https://github.com/ibus/ibus/blob/master/src/ibusenginesimple.c)
+![demo gif](demo.gif)
 
 ## Installation
 
@@ -53,3 +50,12 @@ cargo run --package preproc --bin preproc
 ```
 
 This will generate `dictionary.fst`, `shortcodes.fst` and `symbols.bin`.
+
+
+## IBus resources
+
+Documentation for IBus is pretty poor, so much of the code here is based off of
+the below repos:
+* [ibus-tmpl](https://github.com/phuang/ibus-tmpl)
+* [ibus-unikey](https://github.com/vn-input/ibus-unikey)
+* [ibusenginesimple](https://github.com/ibus/ibus/blob/master/src/ibusenginesimple.c)
