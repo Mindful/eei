@@ -32,15 +32,41 @@ impl fmt::Display for PredictionError {
 
 
 impl Predictor {
+    const returned_word_count: usize = 25;
+
+    fn is_title_cased(context: &str) -> bool {
+        let mut chars = context.chars();
+
+        let first_letter_capitalized = chars.next().map(|char| char.is_ascii_uppercase()).unwrap_or(false);
+        let other_capitals: i8 = chars.map(|char| char.is_ascii_uppercase() as i8).sum();
+        first_letter_capitalized & (other_capitals == 0)
+    }
+
+    fn title_case(word: String) -> String {
+        let mut chars = word.chars();
+        chars.next().unwrap().to_ascii_uppercase().to_string() + chars.as_str()
+    }
+
     pub fn word(&self, context: &str) -> Result<Vec<String>,  PredictionError>  {
-        let matcher = Str::new(context).starts_with();
+        let title_cased = Predictor::is_title_cased(context);
+        let lowercase_context = context.to_ascii_lowercase();
+        let matcher = Str::new(lowercase_context.as_str()).starts_with();
 
         let mut search_results = self.dictionary.search(matcher)
             .into_stream()
             .into_str_vec().map_err(FstError)?;
 
         search_results.sort_by(|(_w1, f1), (_w2, f2)| f2.cmp(f1));
-        let final_results = search_results.into_iter().map(|(word, _freq)| {word}).take(10).collect();
+        let final_results = search_results
+            .into_iter()
+            .map(|(word, _freq)| {
+                if title_cased {
+                    Predictor::title_case(word)
+                } else {
+                    word
+                }
+            })
+            .take(Predictor::returned_word_count).collect();
         Ok(final_results)
     }
 

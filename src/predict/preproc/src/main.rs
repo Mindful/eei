@@ -64,7 +64,7 @@ fn math_symbol_shortcodes() -> Vec<(String, String)> {
             let symbol = &record[2];
             (String::from(&record[3]), String::from(symbol)) //shortcode, symbol
         })
-    }).filter(|(shortcode, symbol)| {whitelist.contains(symbol)} ).collect()
+    }).filter(|(_shortcode, symbol)| {whitelist.contains(symbol)} ).collect()
 }
 
 fn github_emoji_shortcodes() -> Vec<(String, String)> {
@@ -133,7 +133,7 @@ fn load_word_freq_data() -> Result<HashMap<String, u64>, Box<dyn error::Error>> 
             Some(split_line.next().ok_or(InvalidWordFreq(line.clone())).and_then(|word| {
                 split_line.last().ok_or(InvalidWordFreq(line.clone()))
                     .and_then(|x| x.parse::<u64>().map_err(|_| {InvalidWordFreq(line.clone())}))
-                    .map(|count| (word.to_string(), count))
+                    .map(|count| (word.to_lowercase(), count))
             }))
         }
     }).collect::<Result<HashMap<String, u64>, ParseError>>()?)
@@ -145,6 +145,11 @@ fn process_dictionary() -> Result<(), Box<dyn error::Error>> {
 
     let mut lines = io::BufReader::new(File::open("hunspell_US.txt")?)
         .lines()
+        .map(|line_res| {
+            line_res.map(|line| {
+                line.to_lowercase()
+            })
+        })
         .collect::<Result<Vec<_>, _>>()?;
 
     //must be in lexographical order to build the FST
@@ -156,7 +161,7 @@ fn process_dictionary() -> Result<(), Box<dyn error::Error>> {
 
     for line in lines.iter() {
         map_builder.insert(line,
-                           *word_freq.get(line.to_lowercase().as_str()).unwrap_or_else(|| {
+                           *word_freq.get(line.as_str()).unwrap_or_else(|| {
                                                 words_without_freq += 1;
                                                 &0
                                             }))?;

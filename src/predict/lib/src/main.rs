@@ -24,4 +24,6 @@ fn main() {
     symbol_test("u");
     word_test("lit");
     word_test("ang");
+    word_test("Lit");
+    word_test("LiT")
 }
