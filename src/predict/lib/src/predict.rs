@@ -2,7 +2,6 @@ use fst::{Map, IntoStreamer};
 use fst::automaton::{Automaton, Str};
 use lazy_static::lazy_static;
 use crate::predict::PredictionError::*;
-use std::str::Utf8Error;
 use std::fmt;
 
 pub struct Predictor {
@@ -14,25 +13,21 @@ pub struct Predictor {
 #[derive(Debug)]
 pub enum PredictionError {
     FstError(fst::Error),
-    LevenshteinError(fst::automaton::LevenshteinError),
     MissingSymbol(String, u64),
-    FailedStringConversion(Utf8Error)
 }
 
 impl fmt::Display for PredictionError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             FstError(err) => write!(f, "FST error: {}", err),
-            LevenshteinError(err) => write!(f, "Levenshtein error: {}", err),
             MissingSymbol(sym, codepoint) => write!(f, "Missing shortcode: {}, for codepoint {}", sym, codepoint),
-            FailedStringConversion(err) => write!(f, "String conversion error: {}", err)
         }
     }
 }
 
 
 impl Predictor {
-    const returned_word_count: usize = 25;
+    const WORD_COUNT: usize = 25;
 
     fn is_title_cased(context: &str) -> bool {
         let mut chars = context.chars();
@@ -66,7 +61,7 @@ impl Predictor {
                     word
                 }
             })
-            .take(Predictor::returned_word_count).collect();
+            .take(Predictor::WORD_COUNT).collect();
         Ok(final_results)
     }
 
