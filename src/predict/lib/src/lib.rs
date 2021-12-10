@@ -3,13 +3,13 @@ mod predict;
 
 use std::ffi::{CString, NulError, CStr};
 use std::os::raw::{c_char, c_int};
-use log::LevelFilter;
+use log::{LevelFilter, logger};
 use log4rs::append::file::FileAppender;
 use log4rs::encode::pattern::PatternEncoder;
 use log4rs::config::{Appender, Config, Root};
 
 use crate::predict::PREDICTOR;
-use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_CONTROL_MASK, IBUS_e, IBUS_w, IBUS_asciitilde, IBUS_space, IBUS_Return, IBUS_BackSpace, IBUS_Escape, IBUS_Page_Down, IBUS_Page_Up, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down, ibus_engine_hide_auxiliary_text, ibus_lookup_table_set_label, ibus_lookup_table_page_down, ibus_lookup_table_page_up, ibus_lookup_table_get_number_of_candidates, ibus_text_new_from_static_string, ibus_engine_show_lookup_table, ibus_lookup_table_get_cursor_in_page, gunichar, IBusModifierType_IBUS_SHIFT_MASK, ibus_lookup_table_get_candidate};
+use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_CONTROL_MASK, IBUS_e, IBUS_w, IBUS_asciitilde, IBUS_space, IBUS_Return, IBUS_BackSpace, IBUS_Escape, IBUS_Page_Down, IBUS_Page_Up, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down, ibus_engine_hide_auxiliary_text, ibus_lookup_table_set_label, ibus_lookup_table_page_down, ibus_lookup_table_page_up, ibus_lookup_table_get_number_of_candidates, ibus_text_new_from_static_string, ibus_engine_show_lookup_table, ibus_lookup_table_get_cursor_in_page, gunichar, IBusModifierType_IBUS_SHIFT_MASK, ibus_lookup_table_get_candidate, ibus_engine_show_preedit_text, ibus_engine_update_preedit_text, ibus_engine_hide_preedit_text};
 use std::cmp::min;
 use lazy_static::lazy_static;
 use InputMode::*;
@@ -235,7 +235,7 @@ impl EngineCore {
             Ok(word) => {
                 match into_ibus_string(String::from(&word[self.word_buffer.len()..])) {
                     Ok(ibus_word) => {
-                        ibus_engine_commit_text(self.parent_engine_as_ibus_engine(), ibus_word);
+                        self.commit_text_with_preedit(ibus_word);
                     }
                     Err(err) => {
                         log::error!("Failed to convert slice back into ibus string: {}", err);
@@ -251,6 +251,18 @@ impl EngineCore {
         self.word_table_disable()
     }
 
+    unsafe fn commit_text_with_preedit(&mut self, text: *mut IBusText) {
+        /*
+        This method is necessary because some apps behave strangely and/or reject inputs in some
+        cases if the input did not come from preedit text. See https://github.com/Mindful/eei/issues/6
+         */
+        log::info!("commit text {}", CStr::from_ptr((*text).text as *mut c_char).to_str().unwrap());
+
+        ibus_engine_update_preedit_text(self.parent_engine_as_ibus_engine(), text, 0, GBOOL_TRUE);
+        ibus_engine_commit_text(self.parent_engine_as_ibus_engine(), text);
+        ibus_engine_hide_preedit_text(self.parent_engine_as_ibus_engine());
+    }
+
     unsafe fn symbol_commit(&mut self) -> gboolean {
         if self.input_mode != SymbolTable {
             log::error!("Symbol input commit called outside symbol input mode");
@@ -259,7 +271,7 @@ impl EngineCore {
 
         let idx = ibus_lookup_table_get_cursor_in_page(self.get_table());
         let symbol = ibus_lookup_table_get_label(self.get_table(), idx);
-        ibus_engine_commit_text(self.parent_engine_as_ibus_engine(), symbol);
+        self.commit_text_with_preedit(symbol);
 
         self.symbol_table_disable()
     }
