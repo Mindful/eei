@@ -131,27 +131,29 @@ impl EngineCore {
     ** Word input methods
      */
 
-    unsafe fn word_table_enable(&mut self) {
+    unsafe fn word_table_enable(&mut self) -> gboolean {
         if self.table_visible || self.word_buffer.is_empty() {
             //not an error if this is called while word buffer is empty, so don't log
-            return;
+            return GBOOL_FALSE
         }
 
         self.input_mode = WordTable;
         self.table_visible = true;
         self.word_table_update();
+        return GBOOL_TRUE
     }
 
-    unsafe fn word_table_disable(&mut self) {
+    unsafe fn word_table_disable(&mut self) -> gboolean {
         if !self.table_visible {
             log::error!("Call to disable word table while no table is visible");
-            return;
+            return GBOOL_FALSE;
         }
 
         self.input_mode = Normal;
         self.table_visible = false;
         ibus_engine_hide_preedit_text(self.parent_engine_as_ibus_engine());
         ibus_engine_hide_lookup_table(self.parent_engine_as_ibus_engine());
+        return GBOOL_TRUE;
     }
 
     unsafe fn word_table_update(&mut self) {
@@ -231,22 +233,23 @@ impl EngineCore {
     ** Symbol input methods **
      */
 
-    unsafe fn symbol_table_enable(&mut self) {
+    unsafe fn symbol_table_enable(&mut self) -> gboolean {
         if self.table_visible {
             log::error!("Call to enable symbol table while a table is already visible");
-            return;
+            return GBOOL_FALSE;
         }
 
         self.input_mode = SymbolTable;
         self.table_visible = true;
         ibus_lookup_table_clear(self.get_table());
         ibus_engine_update_lookup_table(self.parent_engine_as_ibus_engine(), self.get_table(), GBOOL_TRUE);
+        return GBOOL_TRUE;
     }
 
-    unsafe fn symbol_table_disable(&mut self) {
+    unsafe fn symbol_table_disable(&mut self) -> gboolean {
         if self.input_mode != SymbolTable {
             log::error!("Call to disable symbol table outside of symbol input mode");
-            return;
+            return GBOOL_FALSE;
         }
 
         self.input_mode = Normal;
@@ -258,6 +261,7 @@ impl EngineCore {
         for i in 0..(*self.get_table()).page_size {
             ibus_lookup_table_set_label(self.get_table(), i, ibus_text_new_from_static_string(empty_cstring.as_ptr()));
         }
+        return GBOOL_TRUE;
     }
 
     unsafe fn symbol_input_update(&mut self) {
@@ -364,26 +368,24 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
             IBUS_e => {
                 match engine_core.input_mode {
                     SymbolTable => {
-                        engine_core.symbol_table_disable();
+                        engine_core.symbol_table_disable()
                     }
-                    WordTable => {}
+                    WordTable => {GBOOL_FALSE}
                     Normal => {
-                        engine_core.symbol_table_enable();
+                        engine_core.symbol_table_enable()
                     }
                 }
-                GBOOL_TRUE
             }
             IBUS_w => {
                 match engine_core.input_mode {
-                    SymbolTable => {}
+                    SymbolTable => {GBOOL_FALSE}
                     WordTable => {
-                        engine_core.word_table_disable();
+                        engine_core.word_table_disable()
                     }
                     Normal => {
-                        engine_core.word_table_enable();
+                        engine_core.word_table_enable()
                     }
                 }
-                GBOOL_TRUE
             }
             _ => {
                 GBOOL_FALSE
