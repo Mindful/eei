@@ -8,7 +8,7 @@ use log4rs::encode::pattern::PatternEncoder;
 use log4rs::config::{Appender, Config, Root};
 
 use crate::predict::PREDICTOR;
-use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_CONTROL_MASK, IBUS_e, IBUS_w, IBUS_asciitilde, IBUS_space, IBUS_Return, IBUS_BackSpace, IBUS_Escape, IBUS_Page_Down, IBUS_Page_Up, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down, ibus_engine_hide_auxiliary_text, ibus_lookup_table_set_label, ibus_lookup_table_page_down, ibus_lookup_table_page_up, ibus_lookup_table_get_number_of_candidates, ibus_text_new_from_static_string, ibus_lookup_table_get_cursor_in_page, gunichar, IBusModifierType_IBUS_SHIFT_MASK, ibus_lookup_table_get_candidate, ibus_engine_update_preedit_text, ibus_engine_hide_preedit_text, ibus_text_get_length, ibus_text_append_attribute, IBusAttrType_IBUS_ATTR_TYPE_UNDERLINE, IBusAttrUnderline_IBUS_ATTR_UNDERLINE_SINGLE, gint};
+use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_CONTROL_MASK, IBUS_e, IBUS_w, IBUS_asciitilde, IBUS_space, IBUS_Return, IBUS_BackSpace, IBUS_Escape, IBUS_Page_Down, IBUS_Page_Up, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down, ibus_engine_hide_auxiliary_text, ibus_lookup_table_set_label, ibus_lookup_table_page_down, ibus_lookup_table_page_up, ibus_lookup_table_get_number_of_candidates, ibus_text_new_from_static_string, ibus_lookup_table_get_cursor_in_page, gunichar, IBusModifierType_IBUS_SHIFT_MASK, ibus_lookup_table_get_candidate, ibus_engine_update_preedit_text, ibus_engine_hide_preedit_text, ibus_text_get_length, ibus_text_append_attribute, IBusAttrType_IBUS_ATTR_TYPE_UNDERLINE, IBusAttrUnderline_IBUS_ATTR_UNDERLINE_SINGLE, gint, IBUS_Right, IBUS_Left};
 use std::cmp::min;
 use lazy_static::lazy_static;
 use InputMode::*;
@@ -102,6 +102,13 @@ impl EngineCore {
     }
 
     unsafe fn update_preedit(&mut self) {
+        //Clear preedit if no candidates are available
+        if self.input_mode != Normal && ibus_lookup_table_get_number_of_candidates(self.get_table()) == 0 {
+            ibus_engine_update_preedit_text(self.parent_engine_as_ibus_engine(), into_ibus_string(String::from("")).unwrap(),
+                                            0,GBOOL_TRUE);
+            return
+        }
+
         match self.input_mode {
             SymbolTable => {
                 let idx = ibus_lookup_table_get_cursor_pos(self.get_table());
@@ -140,7 +147,7 @@ impl EngineCore {
         self.input_mode = WordTable;
         self.table_visible = true;
         self.word_table_update();
-        return GBOOL_TRUE
+        GBOOL_TRUE
     }
 
     unsafe fn word_table_disable(&mut self) -> gboolean {
@@ -153,7 +160,7 @@ impl EngineCore {
         self.table_visible = false;
         ibus_engine_hide_preedit_text(self.parent_engine_as_ibus_engine());
         ibus_engine_hide_lookup_table(self.parent_engine_as_ibus_engine());
-        return GBOOL_TRUE;
+        GBOOL_TRUE
     }
 
     unsafe fn word_table_update(&mut self) {
@@ -188,6 +195,10 @@ impl EngineCore {
             Err(err) => {
                 log::error!("{}", err);
             }
+        }
+
+        if ibus_lookup_table_get_number_of_candidates(self.get_table()) == 0 {
+            self.word_table_disable();
         }
     }
 
@@ -243,7 +254,7 @@ impl EngineCore {
         self.table_visible = true;
         ibus_lookup_table_clear(self.get_table());
         ibus_engine_update_lookup_table(self.parent_engine_as_ibus_engine(), self.get_table(), GBOOL_TRUE);
-        return GBOOL_TRUE;
+        GBOOL_TRUE
     }
 
     unsafe fn symbol_table_disable(&mut self) -> gboolean {
@@ -261,7 +272,7 @@ impl EngineCore {
         for i in 0..(*self.get_table()).page_size {
             ibus_lookup_table_set_label(self.get_table(), i, ibus_text_new_from_static_string(empty_cstring.as_ptr()));
         }
-        return GBOOL_TRUE;
+        GBOOL_TRUE
     }
 
     unsafe fn symbol_input_update(&mut self) {
@@ -269,6 +280,7 @@ impl EngineCore {
             log::error!("Word table update called while table invisible or input mode is not symbol");
             return;
         }
+
         match into_ibus_string(self.symbol_preedit.clone()) {
             Ok(ibus_string) => {
                 ibus_engine_update_auxiliary_text(self.parent_engine_as_ibus_engine(), ibus_string, GBOOL_TRUE);
@@ -318,12 +330,13 @@ impl EngineCore {
     unsafe fn symbol_commit(&mut self) {
         if self.input_mode != SymbolTable {
             log::error!("Symbol input commit called outside symbol input mode");
-            return;
         }
 
-        let idx = ibus_lookup_table_get_cursor_in_page(self.get_table());
-        let symbol = ibus_lookup_table_get_label(self.get_table(), idx);
-        self.commit_text(symbol);
+        if !self.symbol_preedit.is_empty() {
+            let idx = ibus_lookup_table_get_cursor_in_page(self.get_table());
+            let symbol = ibus_lookup_table_get_label(self.get_table(), idx);
+            self.commit_text(symbol);
+        }
 
         self.symbol_table_disable();
     }
@@ -427,6 +440,13 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
             engine_core.word_buffer.clear();
             ret
         }
+        IBUS_Right | IBUS_Left => {
+            if engine_core.input_mode == WordTable {
+                engine_core.word_table_disable();
+            }
+            engine_core.word_buffer.clear();
+            GBOOL_FALSE
+        }
         IBUS_Up => {
             if engine_core.table_visible {
                 let ret = ibus_lookup_table_cursor_up(engine_core.get_table());
@@ -449,7 +469,11 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
             match engine_core.input_mode {
                 SymbolTable => {
                     engine_core.symbol_preedit.pop();
-                    engine_core.symbol_input_update();
+                    if engine_core.symbol_preedit.len() == 0 {
+                        engine_core.symbol_table_disable();
+                    } else {
+                        engine_core.symbol_input_update();
+                    }
                     GBOOL_TRUE
                 }
                 WordTable => {
@@ -483,12 +507,10 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
         IBUS_Escape => {
             match engine_core.input_mode {
                 SymbolTable => {
-                    engine_core.symbol_table_disable();
-                    GBOOL_TRUE
+                    engine_core.symbol_table_disable()
                 }
                 WordTable => {
-                    engine_core.word_table_disable();
-                    GBOOL_TRUE
+                    engine_core.word_table_disable()
                 }
                 Normal => {
                     GBOOL_FALSE
@@ -500,18 +522,16 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
                 SymbolTable => {
                     engine_core.symbol_preedit.push((keyval as u8) as char);
                     engine_core.symbol_input_update();
-                    GBOOL_TRUE
                 }
                 WordTable => {
                     engine_core.commit_char(keyval);
                     engine_core.word_table_update();
-                    GBOOL_TRUE
                 }
                 Normal => {
                     engine_core.commit_char(keyval);
-                    GBOOL_TRUE
                 }
             }
+            GBOOL_TRUE
         }
         _ => GBOOL_FALSE
     }
