@@ -10,7 +10,8 @@
 
 typedef struct EngineCore EngineCore;
 
-struct EngineCore *new_engine_core(IBusEEIEngine *parent_engine);
+struct EngineCore *new_engine_core(IBusEEIEngine *parent_engine,
+                                   IBusEngineClass *parent_engine_class);
 
 void free_engine_core(struct EngineCore *engine_state);
 

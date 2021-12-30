@@ -8,7 +8,7 @@ use log4rs::encode::pattern::PatternEncoder;
 use log4rs::config::{Appender, Config, Root};
 
 use crate::predict::PREDICTOR;
-use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_CONTROL_MASK, IBUS_e, IBUS_w, IBUS_asciitilde, IBUS_space, IBUS_Return, IBUS_BackSpace, IBUS_Escape, IBUS_Page_Down, IBUS_Page_Up, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down, ibus_engine_hide_auxiliary_text, ibus_lookup_table_set_label, ibus_lookup_table_page_down, ibus_lookup_table_page_up, ibus_lookup_table_get_number_of_candidates, ibus_text_new_from_static_string, ibus_lookup_table_get_cursor_in_page, gunichar, IBusModifierType_IBUS_SHIFT_MASK, ibus_lookup_table_get_candidate, ibus_engine_update_preedit_text, ibus_engine_hide_preedit_text, ibus_text_get_length, ibus_text_append_attribute, IBusAttrType_IBUS_ATTR_TYPE_UNDERLINE, IBusAttrUnderline_IBUS_ATTR_UNDERLINE_SINGLE, gint, IBUS_Right, IBUS_Left};
+use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_CONTROL_MASK, IBUS_e, IBUS_w, IBUS_asciitilde, IBUS_space, IBUS_Return, IBUS_BackSpace, IBUS_Escape, IBUS_Page_Down, IBUS_Page_Up, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down, ibus_engine_hide_auxiliary_text, ibus_lookup_table_set_label, ibus_lookup_table_page_down, ibus_lookup_table_page_up, ibus_lookup_table_get_number_of_candidates, ibus_text_new_from_static_string, ibus_lookup_table_get_cursor_in_page, gunichar, IBusModifierType_IBUS_SHIFT_MASK, ibus_lookup_table_get_candidate, ibus_engine_update_preedit_text, ibus_engine_hide_preedit_text, ibus_text_get_length, ibus_text_append_attribute, IBusAttrType_IBUS_ATTR_TYPE_UNDERLINE, IBusAttrUnderline_IBUS_ATTR_UNDERLINE_SINGLE, gint, IBUS_Right, IBUS_Left, IBusEngineClass};
 use std::cmp::min;
 use lazy_static::lazy_static;
 use InputMode::*;
@@ -37,11 +37,12 @@ pub struct EngineCore {
     symbol_preedit: String,
     symbol_label_vec: Vec<CString>,
     symbol_last_page: guint,
-    parent_engine: *mut IBusEEIEngine
+    parent_engine: *mut IBusEEIEngine,
+    parent_engine_class: *mut IBusEngineClass,
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn new_engine_core(parent_engine: *mut IBusEEIEngine) -> *mut EngineCore {
+pub unsafe extern "C" fn new_engine_core(parent_engine: *mut IBusEEIEngine, parent_engine_class: *mut IBusEngineClass) -> *mut EngineCore {
     Box::into_raw(Box::new(EngineCore {
         table_visible: false,
         word_buffer: String::new(),
@@ -49,7 +50,8 @@ pub unsafe extern "C" fn new_engine_core(parent_engine: *mut IBusEEIEngine) -> *
         symbol_preedit: String::new(),
         symbol_label_vec: Vec::new(),
         symbol_last_page: 0,
-        parent_engine: parent_engine
+        parent_engine: parent_engine,
+        parent_engine_class: parent_engine_class
     }))
 }
 
@@ -450,6 +452,14 @@ pub unsafe extern "C" fn ibus_eei_engine_focus_out(engine: *mut IBusEngine) {
     match EngineCore::get(engine) {
         Some(engine_core) => {
             engine_core.abort_table_input();
+            match (*engine_core.parent_engine_class).focus_out {
+                Some(parent_focus_out) => {
+                    parent_focus_out(engine);
+                }
+                None => {
+                    log::error!("Could not retrieve parent function for focus out")
+                }
+            }
         }
         None => {
             log::error!("Could not retrieve engine core for focus out");

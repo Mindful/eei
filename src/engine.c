@@ -12,6 +12,7 @@ static void ibus_eei_engine_enable      (IBusEngine             *engine);
 
 G_DEFINE_TYPE (IBusEEIEngine, ibus_eei_engine, IBUS_TYPE_ENGINE)
 
+static IBusEngineClass* parent_class = NULL;
 
 static gboolean can_get_surrounding_text(IBusEEIEngine *eei)
 {
@@ -25,6 +26,7 @@ ibus_eei_engine_class_init (IBusEEIEngineClass *klass)
 	IBusEngineClass *engine_class = IBUS_ENGINE_CLASS (klass);
 
 	ibus_object_class->destroy = (IBusObjectDestroyFunc) ibus_eei_engine_destroy;
+    parent_class = (IBusEngineClass* )g_type_class_peek_parent(klass);
 
     engine_class->process_key_event = ibus_eei_engine_process_key_event;
     engine_class->page_down = ibus_eei_engine_page_down_button;
@@ -37,7 +39,7 @@ ibus_eei_engine_class_init (IBusEEIEngineClass *klass)
 static void
 ibus_eei_engine_init (IBusEEIEngine *eei)
 {
-    eei->engine_core = new_engine_core(eei);
+    eei->engine_core = new_engine_core(eei, parent_class);
     eei->table = ibus_lookup_table_new (9, 0, TRUE, TRUE);
     g_object_ref_sink (eei->table);
 }
