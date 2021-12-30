@@ -111,7 +111,8 @@ impl EngineCore {
 
         match self.input_mode {
             SymbolTable => {
-                let idx = ibus_lookup_table_get_cursor_pos(self.get_table());
+                let page_size = (*self.get_table()).page_size;
+                let idx = ibus_lookup_table_get_cursor_pos(self.get_table()) % page_size;
                 let symbol = ibus_lookup_table_get_label(self.get_table(), idx);
                 let len = ibus_text_get_length(symbol);
                 ibus_text_append_attribute(symbol, IBusAttrType_IBUS_ATTR_TYPE_UNDERLINE,
@@ -252,6 +253,7 @@ impl EngineCore {
 
         self.input_mode = SymbolTable;
         self.table_visible = true;
+        self.symbol_last_page = 0;
         ibus_lookup_table_clear(self.get_table());
         ibus_engine_update_lookup_table(self.parent_engine_as_ibus_engine(), self.get_table(), GBOOL_TRUE);
         GBOOL_TRUE
@@ -317,7 +319,7 @@ impl EngineCore {
                         }
                     }
                 }
-                log::info!("{} candidates and {} labels", ibus_lookup_table_get_number_of_candidates(self.get_table()), (*(*self.get_table()).labels).len);
+                log::info!("{} candidates and {} labels", ibus_lookup_table_get_number_of_candidates(self.get_table()), self.symbol_label_vec.len());
                 ibus_engine_update_lookup_table(self.parent_engine_as_ibus_engine(), table, GBOOL_TRUE);
             },
             Err(err) => {
