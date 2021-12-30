@@ -63,6 +63,59 @@ impl EngineCore {
     ** General Methods **
     */
 
+    unsafe fn page_down_and_update(&mut self) -> gboolean {
+        if self.table_visible {
+            let res = ibus_lookup_table_page_down(self.get_table());
+            self.update_lookup_table();
+            res
+        } else {
+            GBOOL_FALSE
+        }
+    }
+
+    unsafe fn page_up_and_update(&mut self) -> gboolean {
+        if self.table_visible {
+            let res = ibus_lookup_table_page_up(self.get_table());
+            self.update_lookup_table();
+            res
+        } else {
+            GBOOL_FALSE
+        }
+    }
+
+    unsafe fn abort_table_input(&mut self) -> gboolean {
+        match self.input_mode {
+            SymbolTable => {
+                self.symbol_table_disable()
+            }
+            WordTable => {
+                self.word_buffer.clear();
+                self.word_table_disable()
+            }
+            Normal => {
+                GBOOL_FALSE
+            }
+        }
+    }
+
+    unsafe fn commit_from_table(&mut self, idx: Option<guint>) -> gboolean {
+        let ret = match self.input_mode {
+            SymbolTable => {
+                self.symbol_commit(idx);
+                GBOOL_TRUE
+            }
+            WordTable => {
+                self.word_commit(idx);
+                GBOOL_TRUE
+            }
+            Normal => {
+                GBOOL_FALSE
+            }
+        };
+        self.word_buffer.clear();
+        ret
+    }
+
     fn parent_engine_as_ibus_engine(&self) -> *mut IBusEngine {
         self.parent_engine as *mut IBusEngine
     }
@@ -203,13 +256,16 @@ impl EngineCore {
         }
     }
 
-    unsafe fn word_commit(&mut self) {
+    unsafe fn word_commit(&mut self, input_idx: Option<guint>) {
         if !self.table_visible || self.input_mode != WordTable {
             log::error!("Word commit called outside word input mode");
             return;
         }
 
-        let idx = ibus_lookup_table_get_cursor_pos(self.get_table());
+        let idx = input_idx.unwrap_or_else(|| {
+            ibus_lookup_table_get_cursor_pos(self.get_table())
+        });
+        log::info!("Word commit for idx {}", idx);
         let candidate = ibus_lookup_table_get_candidate(self.get_table(), idx);
         self.get_word_remainder(candidate)
             .map(|remainder| {
@@ -329,13 +385,15 @@ impl EngineCore {
         self.update_preedit();
     }
 
-    unsafe fn symbol_commit(&mut self) {
+    unsafe fn symbol_commit(&mut self, input_idx: Option<guint>) {
         if self.input_mode != SymbolTable {
             log::error!("Symbol input commit called outside symbol input mode");
         }
 
         if !self.symbol_preedit.is_empty() {
-            let idx = ibus_lookup_table_get_cursor_in_page(self.get_table());
+            let idx = input_idx.unwrap_or_else(|| {
+                ibus_lookup_table_get_cursor_in_page(self.get_table())
+            });
             let symbol = ibus_lookup_table_get_label(self.get_table(), idx);
             self.commit_text(symbol);
         }
@@ -363,15 +421,75 @@ pub struct SymbolPredictions {
     shortcodes: *mut *mut c_char
 }
 
-#[allow(unused_variables)]
+#[no_mangle]
+pub unsafe extern "C" fn ibus_eei_engine_page_down_button(engine: *mut IBusEngine) {
+    match EngineCore::get(engine) {
+        Some(engine_core) => {
+            engine_core.page_down_and_update();
+        }
+        None => {
+            log::error!("Could not retrieve engine core for page down");
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ibus_eei_engine_page_up_button(engine: *mut IBusEngine) {
+    match EngineCore::get(engine) {
+        Some(engine_core) => {
+            engine_core.page_up_and_update();
+        }
+        None => {
+            log::error!("Could not retrieve engine core for page up");
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ibus_eei_engine_focus_out(engine: *mut IBusEngine) {
+    match EngineCore::get(engine) {
+        Some(engine_core) => {
+            engine_core.abort_table_input();
+        }
+        None => {
+            log::error!("Could not retrieve engine core for focus out");
+        }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ibus_eei_engine_candidate_clicked(engine: *mut IBusEngine, indx: guint, _button_state: guint,
+                                                           _keyboard_state: guint) {
+
+    match EngineCore::get(engine) {
+        Some(engine_core) => {
+            let offset = if engine_core.input_mode == WordTable {
+                //the event input indx is relative, not absolute, so we have to compute where we are
+                //in the entire table and not just this page
+                let page_size = (*engine_core.get_table()).page_size;
+                let idx = ibus_lookup_table_get_cursor_pos(engine_core.get_table());
+                let page_num = idx / page_size;
+                page_num * page_size
+            } else {
+                //symbol input uses relative indices anyway so there's no issue
+                0
+            };
+            engine_core.commit_from_table(Some(offset + indx));
+        }
+        None => {
+            log::error!("Could not retrieve engine core for candidate clicked");
+        }
+    }
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngine, keyval: guint,
-    keycode: guint, modifiers: guint) -> gboolean {
+    _keycode: guint, modifiers: guint) -> gboolean {
 
     let engine_core = match EngineCore::get(engine) {
         Some(engine_ref) => engine_ref,
         None => {
-            log::error!("Could not retrieve engine core");
+            log::error!("Could not retrieve engine core for key eent");
             return GBOOL_FALSE
         }
     };
@@ -426,21 +544,7 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
             GBOOL_TRUE
         }
         IBUS_Return => {
-            let ret = match engine_core.input_mode {
-                SymbolTable => {
-                    engine_core.symbol_commit();
-                    GBOOL_TRUE
-                }
-                WordTable => {
-                    engine_core.word_commit();
-                    GBOOL_TRUE
-                }
-                Normal => {
-                    GBOOL_FALSE
-                }
-            };
-            engine_core.word_buffer.clear();
-            ret
+            engine_core.commit_from_table(None)
         }
         IBUS_Right | IBUS_Left => {
             if engine_core.input_mode == WordTable {
@@ -489,35 +593,13 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
             }
         }
         IBUS_Page_Down => {
-            if engine_core.table_visible {
-                let res = ibus_lookup_table_page_down(engine_core.get_table());
-                engine_core.update_lookup_table();
-                return res
-            } else {
-                GBOOL_FALSE
-            }
+            engine_core.page_down_and_update()
         }
         IBUS_Page_Up => {
-            if engine_core.table_visible {
-                let res = ibus_lookup_table_page_up(engine_core.get_table());
-                engine_core.update_lookup_table();
-                return res
-            } else {
-                GBOOL_FALSE
-            }
+            engine_core.page_up_and_update()
         }
         IBUS_Escape => {
-            match engine_core.input_mode {
-                SymbolTable => {
-                    engine_core.symbol_table_disable()
-                }
-                WordTable => {
-                    engine_core.word_table_disable()
-                }
-                Normal => {
-                    GBOOL_FALSE
-                }
-            }
+            engine_core.abort_table_input()
         }
         IBUS_space..=IBUS_asciitilde => {
             match engine_core.input_mode {
@@ -554,7 +636,7 @@ pub unsafe extern "C" fn configure_logging() {
             // https://stackoverflow.com/questions/56345288/how-do-i-use-log4rs-rollingfileappender-to-incorporate-rolling-logging
             let window_size = 3; // log0, log1, log2
             let fixed_window_roller = FixedWindowRoller::builder().build(location.join("log_archive_{}.txt").to_str().unwrap(), window_size).unwrap();
-            let size_limit = 1024 * 5; // 5KB as max size before roll
+            let size_limit = 1024 * 1000;
             let size_trigger = SizeTrigger::new(size_limit);
             let compound_policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(fixed_window_roller));
 

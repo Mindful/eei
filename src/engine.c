@@ -27,6 +27,10 @@ ibus_eei_engine_class_init (IBusEEIEngineClass *klass)
 	ibus_object_class->destroy = (IBusObjectDestroyFunc) ibus_eei_engine_destroy;
 
     engine_class->process_key_event = ibus_eei_engine_process_key_event;
+    engine_class->page_down = ibus_eei_engine_page_down_button;
+    engine_class->page_up = ibus_eei_engine_page_up_button;
+    engine_class->candidate_clicked = ibus_eei_engine_candidate_clicked;
+    engine_class->focus_out = ibus_eei_engine_focus_out;
     engine_class->enable = ibus_eei_engine_enable;
 }
 
@@ -60,41 +64,4 @@ ibus_eei_engine_enable  (IBusEngine *engine)
     // dummy call to tell the input context that the engine will utilize surrounding-text
     ibus_engine_get_surrounding_text (engine, NULL, NULL, NULL);
 }
-
-
-//static void
-//ibus_eei_engine_update_preedit (IBusEEIEngine *eei)
-//{
-//    IBusText *text;
-//
-//    text = ibus_text_new_from_static_string (eei->preedit->str);
-//    text->attrs = ibus_attr_list_new ();
-//
-//    ibus_attr_list_append (text->attrs,
-//                           ibus_attr_underline_new (IBUS_ATTR_UNDERLINE_SINGLE, 0, eei->preedit->len));
-//
-//
-//    ibus_engine_update_auxiliary_text((IBusEngine *)eei, ibus_text_new_from_static_string("AUXTEXT"), TRUE);
-//    ibus_engine_update_preedit_text ((IBusEngine *)eei,
-//                                     text,
-//                                     eei->cursor_pos,
-//                                     TRUE);
-//
-//}
-
-///* commit preedit to client and update preedit */
-//static gboolean
-//ibus_eei_engine_commit_preedit (IBusEEIEngine *eei)
-//{
-//    if (eei->preedit->len == 0)
-//        return FALSE;
-//
-//    ibus_eei_engine_commit_string (eei, eei->preedit->str);
-//    g_string_assign (eei->preedit, "");
-//    eei->cursor_pos = 0;
-//
-//    ibus_eei_engine_update (eei);
-//
-//    return TRUE;
-//}
 

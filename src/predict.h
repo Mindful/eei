@@ -14,9 +14,20 @@ struct EngineCore *new_engine_core(IBusEEIEngine *parent_engine);
 
 void free_engine_core(struct EngineCore *engine_state);
 
+void ibus_eei_engine_page_down_button(IBusEngine *engine);
+
+void ibus_eei_engine_page_up_button(IBusEngine *engine);
+
+void ibus_eei_engine_focus_out(IBusEngine *engine);
+
+void ibus_eei_engine_candidate_clicked(IBusEngine *engine,
+                                       guint indx,
+                                       guint _button_state,
+                                       guint _keyboard_state);
+
 gboolean ibus_eei_engine_process_key_event(IBusEngine *engine,
                                            guint keyval,
-                                           guint keycode,
+                                           guint _keycode,
                                            guint modifiers);
 
 void configure_logging(void);
