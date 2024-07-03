@@ -252,10 +252,6 @@ impl EngineCore {
                 log::error!("{}", err);
             }
         }
-
-        if ibus_lookup_table_get_number_of_candidates(self.get_table()) == 0 {
-            self.word_table_disable();
-        }
     }
 
     unsafe fn word_commit(&mut self, input_idx: Option<guint>) {
@@ -598,6 +594,7 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
                     GBOOL_FALSE //let the character pass through so deletion still happens
                 }
                 Normal => {
+                    engine_core.word_buffer.pop();
                     GBOOL_FALSE
                 }
             }
