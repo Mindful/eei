@@ -1,6 +1,6 @@
-#include "engine.h"
+#include "eei/engine.h"
 #include <stdio.h>
-#include "predict.h"
+#include "eei/predict.h"
 
 
 /* functions prototype */

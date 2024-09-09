@@ -11,11 +11,16 @@ that does way less.
 
 Assuming you are set up to compile both C and Rust, installation should be
 as simple as:
+
 ```shell
 git clone git@github.com:Mindful/eei.git
-cd eei
 ./install.sh
 ```
+
+## Advanced installation
+Further instruction can be found at [`INSTALL`](INSTALL)
+
+## Usage
 
 Then, to actually use your new input method:
 
@@ -34,7 +39,8 @@ necessary unless you want to rebuild or modify the dictionary data.
 First, download the en_US hunspell dictionary data from http://wordlist.aspell.net/dicts/
 ```shell
 sudo apt-get install hunspell-tools
-unzip hunspell-en_US-2020.12.07.zip
+wget http://downloads.sourceforge.net/wordlist/hunspell-en_US-2020.12.07.zip
+unzip -o hunspell-en_US-2020.12.07.zip
 unmunch en_US.dic en_US.aff > hunspell_US.txt
 ```
 
