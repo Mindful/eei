@@ -6,8 +6,6 @@ autom4te.cache/
 .deps/
 stamp-*
 *.xml
-src/predict/target
-src/predict/ibus/src/ibus_bindings.rs
 .cmake
 
 hunspell_US.txt
@@ -82,6 +80,7 @@ Testing
 
 # Generated files
 .idea/**/contentModel.xml
+/include/eei/predict.h
 
 # Sensitive or high-churn files
 .idea/**/dataSources/
@@ -111,6 +110,7 @@ Testing
 
 # CMake
 cmake-build-*/
+/build*
 
 # Mongo Explorer plugin
 .idea/**/mongoSettings.xml
@@ -141,3 +141,7 @@ fabric.properties
 
 # Android studio 3.1+ serialized cache file
 .idea/caches/build_file_checksums.ser
+
+# Vim
+*.sw[pon]
+*~

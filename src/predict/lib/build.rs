@@ -1,6 +1,6 @@
 extern crate cbindgen;
 
-use std::env;static GENERATED_HEADER: &str = "../../predict.h";
+use std::env;static GENERATED_HEADER: &str = "../../../include/eei/predict.h";
 
 fn main() {
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();

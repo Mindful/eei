@@ -1,6 +1,6 @@
 use std::path::Path;
 
-static ENGINE_HEADER: &str = "../../engine.h";
+static ENGINE_HEADER: &str = "../../../include/eei/engine.h";
 static BINDING_FILE: &str = "src/ibus_bindings.rs";
 
 fn main() {

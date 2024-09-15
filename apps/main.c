@@ -2,8 +2,8 @@
 
 #include <ibus.h>
 #include <stdio.h>
-#include "engine.h"
-#include "predict.h"
+#include "eei/engine.h"
+#include "eei/predict.h"
 
 static IBusBus *bus = NULL;
 static IBusFactory *factory = NULL;
