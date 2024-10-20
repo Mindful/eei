@@ -32,7 +32,7 @@ ibus_eei_engine_class_init (IBusEEIEngineClass *klass)
     engine_class->page_down = ibus_eei_engine_page_down_button;
     engine_class->page_up = ibus_eei_engine_page_up_button;
     engine_class->candidate_clicked = ibus_eei_engine_candidate_clicked;
-    engine_class->focus_out = ibus_eei_engine_focus_out;
+    engine_class->reset = ibus_eei_engine_reset;
     engine_class->enable = ibus_eei_engine_enable;
 }
 

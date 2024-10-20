@@ -444,21 +444,21 @@ pub unsafe extern "C" fn ibus_eei_engine_page_up_button(engine: *mut IBusEngine)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ibus_eei_engine_focus_out(engine: *mut IBusEngine) {
+pub unsafe extern "C" fn ibus_eei_engine_reset(engine: *mut IBusEngine) {
     match EngineCore::get(engine) {
         Some(engine_core) => {
             engine_core.abort_table_input();
-            match (*engine_core.parent_engine_class).focus_out {
-                Some(parent_focus_out) => {
-                    parent_focus_out(engine);
+            match (*engine_core.parent_engine_class).reset {
+                Some(parent_reset) => {
+                    parent_reset(engine);
                 }
                 None => {
-                    log::error!("Could not retrieve parent function for focus out")
+                    log::error!("Could not retrieve parent function for reset")
                 }
             }
         }
         None => {
-            log::error!("Could not retrieve engine core for focus out");
+            log::error!("Could not retrieve engine core for reset");
         }
     }
 }
