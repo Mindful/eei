@@ -1,23 +1,39 @@
 #![allow(non_upper_case_globals)]
 mod predict;
 
-use std::ffi::{CString, NulError, CStr};
-use std::os::raw::{c_char, c_int};
-use log::{LevelFilter};
-use log4rs::encode::pattern::PatternEncoder;
+use log::LevelFilter;
 use log4rs::config::{Appender, Config, Root};
+use log4rs::encode::pattern::PatternEncoder;
+use std::ffi::{CStr, CString, NulError};
+use std::os::raw::{c_char, c_int};
 
 use crate::predict::PREDICTOR;
-use ibus::{IBusEEIEngine, gboolean, GBOOL_FALSE, ibus_engine_update_lookup_table, IBusEngine, GBOOL_TRUE, ibus_engine_hide_lookup_table, guint, IBusModifierType_IBUS_CONTROL_MASK, IBUS_e, IBUS_w, IBUS_asciitilde, IBUS_space, IBUS_Return, IBUS_BackSpace, IBUS_Escape, IBUS_Page_Down, IBUS_Page_Up, ibus_engine_commit_text, ibus_text_new_from_unichar, ibus_text_new_from_string, gchar, ibus_lookup_table_clear, ibus_lookup_table_append_candidate, IBusText, ibus_engine_update_auxiliary_text, IBUS_Up, IBUS_Down, ibus_lookup_table_get_cursor_pos, IBusLookupTable, ibus_lookup_table_get_label, ibus_lookup_table_cursor_up, ibus_lookup_table_cursor_down, ibus_engine_hide_auxiliary_text, ibus_lookup_table_set_label, ibus_lookup_table_page_down, ibus_lookup_table_page_up, ibus_lookup_table_get_number_of_candidates, ibus_text_new_from_static_string, ibus_lookup_table_get_cursor_in_page, gunichar, IBusModifierType_IBUS_SHIFT_MASK, ibus_lookup_table_get_candidate, ibus_engine_update_preedit_text, ibus_engine_hide_preedit_text, ibus_text_get_length, ibus_text_append_attribute, IBusAttrType_IBUS_ATTR_TYPE_UNDERLINE, IBusAttrUnderline_IBUS_ATTR_UNDERLINE_SINGLE, gint, IBUS_Right, IBUS_Left, IBusEngineClass};
-use std::cmp::min;
+use ibus::{
+    gboolean, gchar, gint, guint, gunichar, ibus_engine_commit_text,
+    ibus_engine_hide_auxiliary_text, ibus_engine_hide_lookup_table, ibus_engine_hide_preedit_text,
+    ibus_engine_update_auxiliary_text, ibus_engine_update_lookup_table,
+    ibus_engine_update_preedit_text, ibus_lookup_table_append_candidate, ibus_lookup_table_clear,
+    ibus_lookup_table_cursor_down, ibus_lookup_table_cursor_up, ibus_lookup_table_get_candidate,
+    ibus_lookup_table_get_cursor_in_page, ibus_lookup_table_get_cursor_pos,
+    ibus_lookup_table_get_label, ibus_lookup_table_get_number_of_candidates,
+    ibus_lookup_table_page_down, ibus_lookup_table_page_up, ibus_lookup_table_set_label,
+    ibus_text_append_attribute, ibus_text_get_length, ibus_text_new_from_static_string,
+    ibus_text_new_from_string, ibus_text_new_from_unichar, IBUS_BackSpace, IBUS_Down, IBUS_Escape,
+    IBUS_Left, IBUS_Page_Down, IBUS_Page_Up, IBUS_Return, IBUS_Right, IBUS_Up, IBUS_asciitilde,
+    IBUS_e, IBUS_space, IBUS_w, IBusAttrType_IBUS_ATTR_TYPE_UNDERLINE,
+    IBusAttrUnderline_IBUS_ATTR_UNDERLINE_SINGLE, IBusEEIEngine, IBusEngine, IBusEngineClass,
+    IBusLookupTable, IBusModifierType_IBUS_CONTROL_MASK, IBusModifierType_IBUS_SHIFT_MASK,
+    IBusText, GBOOL_FALSE, GBOOL_TRUE,
+};
 use lazy_static::lazy_static;
-use InputMode::*;
-use std::path::Path;
 use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWindowRoller;
 use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
 use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
-use log4rs::filter::threshold::ThresholdFilter;
 use log4rs::append::rolling_file::RollingFileAppender;
+use log4rs::filter::threshold::ThresholdFilter;
+use std::cmp::min;
+use std::path::Path;
+use InputMode::*;
 
 lazy_static! {
     static ref empty_cstring: CString = CString::new("").unwrap();
@@ -27,7 +43,7 @@ lazy_static! {
 enum InputMode {
     Normal,
     SymbolTable,
-    WordTable
+    WordTable,
 }
 
 pub struct EngineCore {
@@ -42,7 +58,10 @@ pub struct EngineCore {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn new_engine_core(parent_engine: *mut IBusEEIEngine, parent_engine_class: *mut IBusEngineClass) -> *mut EngineCore {
+pub unsafe extern "C" fn new_engine_core(
+    parent_engine: *mut IBusEEIEngine,
+    parent_engine_class: *mut IBusEngineClass,
+) -> *mut EngineCore {
     Box::into_raw(Box::new(EngineCore {
         table_visible: false,
         word_buffer: String::new(),
@@ -51,19 +70,19 @@ pub unsafe extern "C" fn new_engine_core(parent_engine: *mut IBusEEIEngine, pare
         symbol_label_vec: Vec::new(),
         symbol_last_page: 0,
         parent_engine: parent_engine,
-        parent_engine_class: parent_engine_class
+        parent_engine_class: parent_engine_class,
     }))
 }
 
 unsafe fn into_ibus_string(input: String) -> Result<*mut IBusText, NulError> {
-    CString::new(input.into_bytes()).map(|cstr| ibus_text_new_from_string(cstr.into_raw() as *const gchar))
+    CString::new(input.into_bytes())
+        .map(|cstr| ibus_text_new_from_string(cstr.into_raw() as *const gchar))
 }
 
 impl EngineCore {
-
     /*
-    ** General Methods **
-    */
+     ** General Methods **
+     */
 
     unsafe fn page_down_and_update(&mut self) -> gboolean {
         if self.table_visible {
@@ -87,16 +106,12 @@ impl EngineCore {
 
     unsafe fn abort_table_input(&mut self) -> gboolean {
         match self.input_mode {
-            SymbolTable => {
-                self.symbol_table_disable()
-            }
+            SymbolTable => self.symbol_table_disable(),
             WordTable => {
                 self.word_buffer.clear();
                 self.word_table_disable()
             }
-            Normal => {
-                GBOOL_FALSE
-            }
+            Normal => GBOOL_FALSE,
         }
     }
 
@@ -110,9 +125,7 @@ impl EngineCore {
                 self.word_commit(idx);
                 GBOOL_TRUE
             }
-            Normal => {
-                GBOOL_FALSE
-            }
+            Normal => GBOOL_FALSE,
         };
         self.word_buffer.clear();
         ret
@@ -132,11 +145,19 @@ impl EngineCore {
 
     unsafe fn commit_char(&mut self, keyval: guint) {
         self.word_buffer.push((keyval as u8) as char);
-        ibus_engine_commit_text(self.parent_engine_as_ibus_engine(), ibus_text_new_from_unichar(keyval as gunichar));
+        ibus_engine_commit_text(
+            self.parent_engine_as_ibus_engine(),
+            ibus_text_new_from_unichar(keyval as gunichar),
+        );
     }
 
     unsafe fn commit_text(&mut self, text: *mut IBusText) {
-        log::info!("commit text {}", CStr::from_ptr((*text).text as *mut c_char).to_str().unwrap());
+        log::info!(
+            "commit text {}",
+            CStr::from_ptr((*text).text as *mut c_char)
+                .to_str()
+                .unwrap()
+        );
         ibus_engine_commit_text(self.parent_engine_as_ibus_engine(), text);
     }
 
@@ -147,21 +168,45 @@ impl EngineCore {
             let page_num = idx / page_size;
             if self.symbol_last_page != page_num {
                 self.symbol_last_page = page_num;
-                for (idx, table_idx) in (page_num * page_size..min(page_size * (page_size+1), self.symbol_label_vec.len() as u32)).enumerate() {
-                    ibus_lookup_table_set_label(self.get_table(), idx as guint, ibus_text_new_from_static_string(self.symbol_label_vec.get_unchecked(table_idx as usize).as_ptr()))
+                for (idx, table_idx) in (page_num * page_size
+                    ..min(
+                        page_size * (page_size + 1),
+                        self.symbol_label_vec.len() as u32,
+                    ))
+                    .enumerate()
+                {
+                    ibus_lookup_table_set_label(
+                        self.get_table(),
+                        idx as guint,
+                        ibus_text_new_from_static_string(
+                            self.symbol_label_vec
+                                .get_unchecked(table_idx as usize)
+                                .as_ptr(),
+                        ),
+                    )
                 }
             }
         }
-        ibus_engine_update_lookup_table(self.parent_engine_as_ibus_engine(), self.get_table(), GBOOL_TRUE);
+        ibus_engine_update_lookup_table(
+            self.parent_engine_as_ibus_engine(),
+            self.get_table(),
+            GBOOL_TRUE,
+        );
         self.update_preedit();
     }
 
     unsafe fn update_preedit(&mut self) {
         //Clear preedit if no candidates are available
-        if self.input_mode != Normal && ibus_lookup_table_get_number_of_candidates(self.get_table()) == 0 {
-            ibus_engine_update_preedit_text(self.parent_engine_as_ibus_engine(), into_ibus_string(String::from("")).unwrap(),
-                                            0,GBOOL_TRUE);
-            return
+        if self.input_mode != Normal
+            && ibus_lookup_table_get_number_of_candidates(self.get_table()) == 0
+        {
+            ibus_engine_update_preedit_text(
+                self.parent_engine_as_ibus_engine(),
+                into_ibus_string(String::from("")).unwrap(),
+                0,
+                GBOOL_TRUE,
+            );
+            return;
         }
 
         match self.input_mode {
@@ -170,20 +215,38 @@ impl EngineCore {
                 let idx = ibus_lookup_table_get_cursor_pos(self.get_table()) % page_size;
                 let symbol = ibus_lookup_table_get_label(self.get_table(), idx);
                 let len = ibus_text_get_length(symbol);
-                ibus_text_append_attribute(symbol, IBusAttrType_IBUS_ATTR_TYPE_UNDERLINE,
-                                           IBusAttrUnderline_IBUS_ATTR_UNDERLINE_SINGLE, 0, len as gint);
-                ibus_engine_update_preedit_text(self.parent_engine_as_ibus_engine(), symbol,
-                                                len,GBOOL_TRUE);
+                ibus_text_append_attribute(
+                    symbol,
+                    IBusAttrType_IBUS_ATTR_TYPE_UNDERLINE,
+                    IBusAttrUnderline_IBUS_ATTR_UNDERLINE_SINGLE,
+                    0,
+                    len as gint,
+                );
+                ibus_engine_update_preedit_text(
+                    self.parent_engine_as_ibus_engine(),
+                    symbol,
+                    len,
+                    GBOOL_TRUE,
+                );
             }
             WordTable => {
                 let idx = ibus_lookup_table_get_cursor_pos(self.get_table());
                 let candidate = ibus_lookup_table_get_candidate(self.get_table(), idx);
                 self.get_word_remainder(candidate).map(|remainder| {
                     let len = ibus_text_get_length(remainder);
-                    ibus_text_append_attribute(remainder, IBusAttrType_IBUS_ATTR_TYPE_UNDERLINE,
-                                               IBusAttrUnderline_IBUS_ATTR_UNDERLINE_SINGLE, 0, len as gint);
-                    ibus_engine_update_preedit_text(self.parent_engine_as_ibus_engine(), remainder,
-                                                    len, GBOOL_TRUE);
+                    ibus_text_append_attribute(
+                        remainder,
+                        IBusAttrType_IBUS_ATTR_TYPE_UNDERLINE,
+                        IBusAttrUnderline_IBUS_ATTR_UNDERLINE_SINGLE,
+                        0,
+                        len as gint,
+                    );
+                    ibus_engine_update_preedit_text(
+                        self.parent_engine_as_ibus_engine(),
+                        remainder,
+                        len,
+                        GBOOL_TRUE,
+                    );
                 });
             }
             Normal => {}
@@ -191,13 +254,13 @@ impl EngineCore {
     }
 
     /*
-    ** Word input methods
+     ** Word input methods
      */
 
     unsafe fn word_table_enable(&mut self) -> gboolean {
         if self.table_visible || self.word_buffer.is_empty() {
             //not an error if this is called while word buffer is empty, so don't log
-            return GBOOL_FALSE
+            return GBOOL_FALSE;
         }
 
         self.input_mode = WordTable;
@@ -223,29 +286,34 @@ impl EngineCore {
         if !self.table_visible || self.input_mode != WordTable {
             log::error!("Word table update called while table invisible or input mode is not word");
             return;
-        }
-        else if self.word_buffer.is_empty() {
+        } else if self.word_buffer.is_empty() {
             self.word_table_disable();
             return;
         }
 
-        let search_result  = PREDICTOR.word(self.word_buffer.as_str());
+        let search_result = PREDICTOR.word(self.word_buffer.as_str());
         match search_result {
             Ok(candidates) => {
-                log::info!("Word search for {} and got {:?}", self.word_buffer, candidates);
+                log::info!(
+                    "Word search for {} and got {:?}",
+                    self.word_buffer,
+                    candidates
+                );
                 let table = self.get_table();
                 ibus_lookup_table_clear(table);
                 for word in candidates {
                     match into_ibus_string(word) {
-                        Ok(ibus_text) => {
-                            ibus_lookup_table_append_candidate(table, ibus_text)
-                        }
+                        Ok(ibus_text) => ibus_lookup_table_append_candidate(table, ibus_text),
                         Err(err) => {
                             log::error!("Failed string conversion for word lookup: {}", err);
                         }
                     }
                 }
-                ibus_engine_update_lookup_table(self.parent_engine_as_ibus_engine(), table, GBOOL_TRUE);
+                ibus_engine_update_lookup_table(
+                    self.parent_engine_as_ibus_engine(),
+                    table,
+                    GBOOL_TRUE,
+                );
                 self.update_preedit();
             }
             Err(err) => {
@@ -260,15 +328,11 @@ impl EngineCore {
             return;
         }
 
-        let idx = input_idx.unwrap_or_else(|| {
-            ibus_lookup_table_get_cursor_pos(self.get_table())
-        });
+        let idx = input_idx.unwrap_or_else(|| ibus_lookup_table_get_cursor_pos(self.get_table()));
         log::info!("Word commit for idx {}", idx);
         let candidate = ibus_lookup_table_get_candidate(self.get_table(), idx);
         self.get_word_remainder(candidate)
-            .map(|remainder| {
-                self.commit_text(remainder)
-            });
+            .map(|remainder| self.commit_text(remainder));
 
         self.word_buffer.clear();
         self.word_table_disable();
@@ -276,17 +340,13 @@ impl EngineCore {
 
     unsafe fn get_word_remainder(&self, candidate: *mut IBusText) -> Option<*mut IBusText> {
         match CStr::from_ptr((*candidate).text as *const c_char).to_str() {
-            Ok(word) => {
-                match into_ibus_string(String::from(&word[self.word_buffer.len()..])) {
-                    Ok(ibus_word) => {
-                        Some(ibus_word)
-                    }
-                    Err(err) => {
-                        log::error!("Failed to convert slice back into ibus string: {}", err);
-                        None
-                    }
+            Ok(word) => match into_ibus_string(String::from(&word[self.word_buffer.len()..])) {
+                Ok(ibus_word) => Some(ibus_word),
+                Err(err) => {
+                    log::error!("Failed to convert slice back into ibus string: {}", err);
+                    None
                 }
-            }
+            },
             Err(err) => {
                 log::error!("Failed to convert word to string: {}", err);
                 None
@@ -294,9 +354,8 @@ impl EngineCore {
         }
     }
 
-
     /*
-    ** Symbol input methods **
+     ** Symbol input methods **
      */
 
     unsafe fn symbol_table_enable(&mut self) -> gboolean {
@@ -309,7 +368,11 @@ impl EngineCore {
         self.table_visible = true;
         self.symbol_last_page = 0;
         ibus_lookup_table_clear(self.get_table());
-        ibus_engine_update_lookup_table(self.parent_engine_as_ibus_engine(), self.get_table(), GBOOL_TRUE);
+        ibus_engine_update_lookup_table(
+            self.parent_engine_as_ibus_engine(),
+            self.get_table(),
+            GBOOL_TRUE,
+        );
         GBOOL_TRUE
     }
 
@@ -326,23 +389,36 @@ impl EngineCore {
         ibus_engine_hide_lookup_table(self.parent_engine_as_ibus_engine());
         ibus_engine_hide_auxiliary_text(self.parent_engine_as_ibus_engine());
         for i in 0..(*self.get_table()).page_size {
-            ibus_lookup_table_set_label(self.get_table(), i, ibus_text_new_from_static_string(empty_cstring.as_ptr()));
+            ibus_lookup_table_set_label(
+                self.get_table(),
+                i,
+                ibus_text_new_from_static_string(empty_cstring.as_ptr()),
+            );
         }
         GBOOL_TRUE
     }
 
     unsafe fn symbol_input_update(&mut self) {
         if !self.table_visible || self.input_mode != SymbolTable {
-            log::error!("Word table update called while table invisible or input mode is not symbol");
+            log::error!(
+                "Word table update called while table invisible or input mode is not symbol"
+            );
             return;
         }
 
         match into_ibus_string(self.symbol_preedit.clone()) {
             Ok(ibus_string) => {
-                ibus_engine_update_auxiliary_text(self.parent_engine_as_ibus_engine(), ibus_string, GBOOL_TRUE);
+                ibus_engine_update_auxiliary_text(
+                    self.parent_engine_as_ibus_engine(),
+                    ibus_string,
+                    GBOOL_TRUE,
+                );
             }
             Err(err) => {
-                log::error!("Failed string conversion for symbol aux text update: {}", err);
+                log::error!(
+                    "Failed string conversion for symbol aux text update: {}",
+                    err
+                );
             }
         }
 
@@ -350,22 +426,40 @@ impl EngineCore {
             return;
         }
 
-        let search_result  = PREDICTOR.symbol(self.symbol_preedit.as_str());
+        let search_result = PREDICTOR.symbol(self.symbol_preedit.as_str());
         match search_result {
             Ok(candidates) => {
-                log::info!("Symbol search for {} and got {:?}", self.symbol_preedit, candidates);
+                log::info!(
+                    "Symbol search for {} and got {:?}",
+                    self.symbol_preedit,
+                    candidates
+                );
                 let table = self.get_table();
                 // Must clear table first, since the table may have IBusText referencing the
                 // symbol_label_vec strings
                 ibus_lookup_table_clear(table);
                 self.symbol_label_vec.clear();
                 for (idx, (shortcode, ident)) in candidates.into_iter().enumerate() {
-                    match (CString::new(shortcode.into_bytes()),  CString::new(ident.into_bytes())) {
+                    match (
+                        CString::new(shortcode.into_bytes()),
+                        CString::new(ident.into_bytes()),
+                    ) {
                         (Ok(shortcode_cstring), Ok(ident_cstring)) => {
-                            ibus_lookup_table_append_candidate(table, ibus_text_new_from_string(shortcode_cstring.into_raw() as *mut gchar));
+                            ibus_lookup_table_append_candidate(
+                                table,
+                                ibus_text_new_from_string(
+                                    shortcode_cstring.into_raw() as *mut gchar
+                                ),
+                            );
                             self.symbol_label_vec.push(ident_cstring);
                             if idx < (*table).page_size as usize {
-                                ibus_lookup_table_set_label(table, idx as guint, ibus_text_new_from_static_string(self.symbol_label_vec.get_unchecked(idx).as_ptr()));
+                                ibus_lookup_table_set_label(
+                                    table,
+                                    idx as guint,
+                                    ibus_text_new_from_static_string(
+                                        self.symbol_label_vec.get_unchecked(idx).as_ptr(),
+                                    ),
+                                );
                             }
                         }
                         _ => {
@@ -373,9 +467,17 @@ impl EngineCore {
                         }
                     }
                 }
-                log::info!("{} candidates and {} labels", ibus_lookup_table_get_number_of_candidates(self.get_table()), self.symbol_label_vec.len());
-                ibus_engine_update_lookup_table(self.parent_engine_as_ibus_engine(), table, GBOOL_TRUE);
-            },
+                log::info!(
+                    "{} candidates and {} labels",
+                    ibus_lookup_table_get_number_of_candidates(self.get_table()),
+                    self.symbol_label_vec.len()
+                );
+                ibus_engine_update_lookup_table(
+                    self.parent_engine_as_ibus_engine(),
+                    table,
+                    GBOOL_TRUE,
+                );
+            }
             Err(err) => {
                 log::error!("{}", err);
             }
@@ -389,9 +491,8 @@ impl EngineCore {
         }
 
         if !self.symbol_preedit.is_empty() {
-            let idx = input_idx.unwrap_or_else(|| {
-                ibus_lookup_table_get_cursor_in_page(self.get_table())
-            });
+            let idx =
+                input_idx.unwrap_or_else(|| ibus_lookup_table_get_cursor_in_page(self.get_table()));
             let symbol = ibus_lookup_table_get_label(self.get_table(), idx);
             self.commit_text(symbol);
         }
@@ -399,7 +500,6 @@ impl EngineCore {
         self.symbol_table_disable();
     }
 }
-
 
 #[no_mangle]
 pub unsafe extern "C" fn free_engine_core(engine_state: *mut EngineCore) {
@@ -409,14 +509,14 @@ pub unsafe extern "C" fn free_engine_core(engine_state: *mut EngineCore) {
 #[repr(C)]
 pub struct WordPredictions {
     len: c_int,
-    words: *mut *mut c_char
+    words: *mut *mut c_char,
 }
 
 #[repr(C)]
 pub struct SymbolPredictions {
     len: c_int,
     symbols: *mut *mut c_char,
-    shortcodes: *mut *mut c_char
+    shortcodes: *mut *mut c_char,
 }
 
 #[no_mangle]
@@ -483,9 +583,12 @@ pub unsafe extern "C" fn ibus_eei_engine_reset(engine: *mut IBusEngine) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ibus_eei_engine_candidate_clicked(engine: *mut IBusEngine, indx: guint, _button_state: guint,
-                                                           _keyboard_state: guint) {
-
+pub unsafe extern "C" fn ibus_eei_engine_candidate_clicked(
+    engine: *mut IBusEngine,
+    indx: guint,
+    _button_state: guint,
+    _keyboard_state: guint,
+) {
     match EngineCore::get(engine) {
         Some(engine_core) => {
             let offset = if engine_core.input_mode == WordTable {
@@ -508,47 +611,35 @@ pub unsafe extern "C" fn ibus_eei_engine_candidate_clicked(engine: *mut IBusEngi
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngine, keyval: guint,
-    _keycode: guint, modifiers: guint) -> gboolean {
-
+pub unsafe extern "C" fn ibus_eei_engine_process_key_event(
+    engine: *mut IBusEngine,
+    keyval: guint,
+    _keycode: guint,
+    modifiers: guint,
+) -> gboolean {
     let engine_core = match EngineCore::get(engine) {
         Some(engine_ref) => engine_ref,
         None => {
             log::error!("Could not retrieve engine core for key eent");
-            return GBOOL_FALSE
+            return GBOOL_FALSE;
         }
     };
-
 
     if modifiers == IBusModifierType_IBUS_CONTROL_MASK {
         //control key (and only control key) is held down
         return match keyval {
-            IBUS_e => {
-                match engine_core.input_mode {
-                    SymbolTable => {
-                        engine_core.symbol_table_disable()
-                    }
-                    WordTable => {GBOOL_FALSE}
-                    Normal => {
-                        engine_core.symbol_table_enable()
-                    }
-                }
-            }
-            IBUS_w => {
-                match engine_core.input_mode {
-                    SymbolTable => {GBOOL_FALSE}
-                    WordTable => {
-                        engine_core.word_table_disable()
-                    }
-                    Normal => {
-                        engine_core.word_table_enable()
-                    }
-                }
-            }
-            _ => {
-                GBOOL_FALSE
-            }
-        }
+            IBUS_e => match engine_core.input_mode {
+                SymbolTable => engine_core.symbol_table_disable(),
+                WordTable => GBOOL_FALSE,
+                Normal => engine_core.symbol_table_enable(),
+            },
+            IBUS_w => match engine_core.input_mode {
+                SymbolTable => GBOOL_FALSE,
+                WordTable => engine_core.word_table_disable(),
+                Normal => engine_core.word_table_enable(),
+            },
+            _ => GBOOL_FALSE,
+        };
     } else if (modifiers & !IBusModifierType_IBUS_SHIFT_MASK) != 0 {
         return GBOOL_FALSE; //This also covers released keys with IBUS_RELEASE_MASK
     }
@@ -558,7 +649,7 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
             match engine_core.input_mode {
                 SymbolTable => {
                     engine_core.symbol_table_disable();
-                },
+                }
                 WordTable => {
                     engine_core.word_table_disable();
                 }
@@ -568,9 +659,7 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
             engine_core.word_buffer.clear();
             GBOOL_TRUE
         }
-        IBUS_Return => {
-            engine_core.commit_from_table(None)
-        }
+        IBUS_Return => engine_core.commit_from_table(None),
         IBUS_Right | IBUS_Left => {
             if engine_core.input_mode == WordTable {
                 engine_core.word_table_disable();
@@ -618,15 +707,9 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
                 }
             }
         }
-        IBUS_Page_Down => {
-            engine_core.page_down_and_update()
-        }
-        IBUS_Page_Up => {
-            engine_core.page_up_and_update()
-        }
-        IBUS_Escape => {
-            engine_core.abort_table_input()
-        }
+        IBUS_Page_Down => engine_core.page_down_and_update(),
+        IBUS_Page_Up => engine_core.page_up_and_update(),
+        IBUS_Escape => engine_core.abort_table_input(),
         IBUS_space..=IBUS_asciitilde => {
             match engine_core.input_mode {
                 SymbolTable => {
@@ -643,10 +726,9 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(engine: *mut IBusEngi
             }
             GBOOL_TRUE
         }
-        _ => GBOOL_FALSE
+        _ => GBOOL_FALSE,
     }
 }
-
 
 static DATA_DIRNAME: &str = "eei";
 
@@ -654,17 +736,29 @@ static DATA_DIRNAME: &str = "eei";
 pub unsafe extern "C" fn configure_logging() {
     //https://stackoverflow.com/questions/56345288/how-do-i-use-log4rs-rollingfileappender-to-incorporate-rolling-logging
 
-    let log_location = std::env::var("XDG_DATA_HOME").map(|dir| Path::new(dir.as_str()).join(DATA_DIRNAME))
-        .or(std::env::var("HOME").map(|home| Path::new(home.as_str()).join(".local").join("share").join(DATA_DIRNAME)));
+    let log_location = std::env::var("XDG_DATA_HOME")
+        .map(|dir| Path::new(dir.as_str()).join(DATA_DIRNAME))
+        .or(std::env::var("HOME").map(|home| {
+            Path::new(home.as_str())
+                .join(".local")
+                .join("share")
+                .join(DATA_DIRNAME)
+        }));
 
     match log_location {
         Ok(location) => {
             // https://stackoverflow.com/questions/56345288/how-do-i-use-log4rs-rollingfileappender-to-incorporate-rolling-logging
             let window_size = 3; // log0, log1, log2
-            let fixed_window_roller = FixedWindowRoller::builder().build(location.join("log_archive_{}.txt").to_str().unwrap(), window_size).unwrap();
+            let fixed_window_roller = FixedWindowRoller::builder()
+                .build(
+                    location.join("log_archive_{}.txt").to_str().unwrap(),
+                    window_size,
+                )
+                .unwrap();
             let size_limit = 1024 * 1000;
             let size_trigger = SizeTrigger::new(size_limit);
-            let compound_policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(fixed_window_roller));
+            let compound_policy =
+                CompoundPolicy::new(Box::new(size_trigger), Box::new(fixed_window_roller));
 
             let log_level = if cfg!(debug_assertions) {
                 LevelFilter::Debug
@@ -680,8 +774,11 @@ pub unsafe extern "C" fn configure_logging() {
                             "logfile",
                             Box::new(
                                 RollingFileAppender::builder()
-                                    .encoder(Box::new(PatternEncoder::new("{d(%Y-%m-%d %H:%M:%S)} {l}::{m}{n}")))
-                                    .build(location.join("log.txt"), Box::new(compound_policy)).unwrap(),
+                                    .encoder(Box::new(PatternEncoder::new(
+                                        "{d(%Y-%m-%d %H:%M:%S)} {l}::{m}{n}",
+                                    )))
+                                    .build(location.join("log.txt"), Box::new(compound_policy))
+                                    .unwrap(),
                             ),
                         ),
                 )
@@ -689,7 +786,8 @@ pub unsafe extern "C" fn configure_logging() {
                     Root::builder()
                         .appender("logfile")
                         .build(LevelFilter::Debug),
-                ).unwrap();
+                )
+                .unwrap();
 
             log4rs::init_config(config).unwrap();
 
@@ -700,5 +798,3 @@ pub unsafe extern "C" fn configure_logging() {
         }
     }
 }
-
-
