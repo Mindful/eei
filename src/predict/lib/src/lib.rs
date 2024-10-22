@@ -1,4 +1,5 @@
 #![allow(non_upper_case_globals)]
+#![allow(clippy::missing_safety_doc)]
 mod predict;
 
 use log::LevelFilter;
@@ -69,8 +70,8 @@ pub unsafe extern "C" fn new_engine_core(
         symbol_preedit: String::new(),
         symbol_label_vec: Vec::new(),
         symbol_last_page: 0,
-        parent_engine: parent_engine,
-        parent_engine_class: parent_engine_class,
+        parent_engine,
+        parent_engine_class,
     }))
 }
 
@@ -232,7 +233,7 @@ impl EngineCore {
             WordTable => {
                 let idx = ibus_lookup_table_get_cursor_pos(self.get_table());
                 let candidate = ibus_lookup_table_get_candidate(self.get_table(), idx);
-                self.get_word_remainder(candidate).map(|remainder| {
+                if let Some(remainder) = self.get_word_remainder(candidate) {
                     let len = ibus_text_get_length(remainder);
                     ibus_text_append_attribute(
                         remainder,
@@ -247,7 +248,7 @@ impl EngineCore {
                         len,
                         GBOOL_TRUE,
                     );
-                });
+                };
             }
             Normal => {}
         }
@@ -331,8 +332,9 @@ impl EngineCore {
         let idx = input_idx.unwrap_or_else(|| ibus_lookup_table_get_cursor_pos(self.get_table()));
         log::info!("Word commit for idx {}", idx);
         let candidate = ibus_lookup_table_get_candidate(self.get_table(), idx);
-        self.get_word_remainder(candidate)
-            .map(|remainder| self.commit_text(remainder));
+        if let Some(remainder) = self.get_word_remainder(candidate) {
+            self.commit_text(remainder)
+        }
 
         self.word_buffer.clear();
         self.word_table_disable();
@@ -689,7 +691,7 @@ pub unsafe extern "C" fn ibus_eei_engine_process_key_event(
             match engine_core.input_mode {
                 SymbolTable => {
                     engine_core.symbol_preedit.pop();
-                    if engine_core.symbol_preedit.len() == 0 {
+                    if engine_core.symbol_preedit.is_empty() {
                         engine_core.symbol_table_disable();
                     } else {
                         engine_core.symbol_input_update();

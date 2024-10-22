@@ -84,7 +84,7 @@ impl Predictor {
 
         //must be into_iter() and not iter() - the latter iterates over references, but we need
         //to take ownership to return the shortcode data without clone()
-        Ok(search_results
+        search_results
             .into_iter()
             .map(
                 |(shortcode, ident)| match self.symbols.get(ident as usize) {
@@ -92,7 +92,7 @@ impl Predictor {
                     None => Err(MissingSymbol(shortcode, ident)),
                 },
             )
-            .collect::<Result<Vec<_>, _>>()?)
+            .collect::<Result<Vec<_>, _>>()
     }
 }
 

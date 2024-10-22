@@ -1,4 +1,3 @@
-use crate::ParseError::*;
 use fst::MapBuilder;
 use std::collections::{HashMap, HashSet};
 use std::error;
@@ -9,41 +8,42 @@ use std::io::{BufRead, Write};
 use std::num::ParseIntError;
 
 #[derive(Debug, Clone)]
-enum ParseError {
-    InvalidJson(String),
-    InvalidHex(ParseIntError),
-    InvalidCodepoint(u32),
-    InvalidWordFreq(String),
+#[allow(dead_code)]
+enum InvalidParseError {
+    Json(String),
+    Hex(ParseIntError),
+    Codepoint(u32),
+    WordFreq(String),
 }
 
 //code point;class;char;entity name;entity set;note/description;CHARACTER NAME
 
-impl Display for ParseError {
+impl Display for InvalidParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl error::Error for ParseError {}
+impl error::Error for InvalidParseError {}
 
 //https://stackoverflow.com/questions/69152223/unicode-codepoint-to-rust-string
-fn parse_unicode(input: &str) -> Result<char, ParseError> {
-    let unicode = u32::from_str_radix(input, 16).map_err(InvalidHex)?;
-    char::from_u32(unicode).ok_or_else(|| InvalidCodepoint(unicode))
+fn parse_unicode(input: &str) -> Result<char, InvalidParseError> {
+    let unicode = u32::from_str_radix(input, 16).map_err(InvalidParseError::Hex)?;
+    char::from_u32(unicode).ok_or(InvalidParseError::Codepoint(unicode))
 }
 
-fn parse_github_emoji_url(url: &String) -> Result<String, ParseError> {
+fn parse_github_emoji_url(url: &str) -> Result<String, InvalidParseError> {
     let bytecode_strings = url
         .split('/')
         .last()
-        .ok_or(InvalidJson(url.clone()))?
+        .ok_or(InvalidParseError::Json(url.to_owned()))?
         .split('.')
         .next()
-        .ok_or(InvalidJson(url.clone()))?
+        .ok_or(InvalidParseError::Json(url.to_owned()))?
         .split('-');
 
     bytecode_strings
-        .map(|codepoint| parse_unicode(codepoint))
+        .map(parse_unicode)
         .collect::<Result<Vec<_>, _>>()
         .map(|char_vec| char_vec.into_iter().collect::<String>())
 }
@@ -88,7 +88,7 @@ fn github_emoji_shortcodes() -> Vec<(String, String)> {
     json.iter()
         .filter_map(|(key, url)| {
             let key_chars: Vec<char> = key.chars().collect();
-            if key_chars.get(0).map(|c| c == &'u').unwrap_or(false)
+            if key_chars.first().map(|c| c == &'u').unwrap_or(false)
                 && key_chars
                     .get(1)
                     .map(|c| c.is_ascii_digit())
@@ -150,27 +150,28 @@ fn load_word_freq_data() -> Result<HashMap<String, u64>, Box<dyn error::Error>> 
     Ok(lines
         .into_iter()
         .filter_map(|line| {
-            if line.len() == 0 {
+            if line.is_empty() {
                 None
             } else {
                 let mut split_line = line.split("\t");
                 Some(
                     split_line
                         .next()
-                        .ok_or(InvalidWordFreq(line.clone()))
+                        .ok_or(InvalidParseError::WordFreq(line.clone()))
                         .and_then(|word| {
                             split_line
                                 .last()
-                                .ok_or(InvalidWordFreq(line.clone()))
+                                .ok_or(InvalidParseError::WordFreq(line.clone()))
                                 .and_then(|x| {
-                                    x.parse::<u64>().map_err(|_| InvalidWordFreq(line.clone()))
+                                    x.parse::<u64>()
+                                        .map_err(|_| InvalidParseError::WordFreq(line.clone()))
                                 })
                                 .map(|count| (word.to_lowercase(), count))
                         }),
                 )
             }
         })
-        .collect::<Result<HashMap<String, u64>, ParseError>>()?)
+        .collect::<Result<HashMap<String, u64>, InvalidParseError>>()?)
 }
 
 fn process_dictionary() -> Result<(), Box<dyn error::Error>> {
