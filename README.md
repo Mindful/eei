@@ -58,6 +58,9 @@ cargo run --package preproc --bin preproc symbols dictionary
 
 This will generate `dictionary.fst`, `shortcodes.fst` and `symbols.bin`.
 
+### Custom shortcodes/symbols
+You can add custom shortcodes and their associated symbols by editing the `custom_shortcodes.tsv` file in `src/predict` and then regenerating the symbols file. 
+
 
 ## IBus resources
 
