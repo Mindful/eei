@@ -1,11 +1,11 @@
 use fst::MapBuilder;
 use std::collections::{HashMap, HashSet};
-use std::error;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io;
 use std::io::{BufRead, Write};
 use std::num::ParseIntError;
+use std::{env, error};
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -65,7 +65,8 @@ fn math_symbol_shortcodes() -> Vec<(String, String)> {
         .has_headers(false)
         .from_reader(reader);
 
-    rdr.into_records()
+    let output: Vec<(String, String)> = rdr
+        .into_records()
         .filter_map(|result| {
             result.ok().map(|record| {
                 let symbol = &record[2];
@@ -73,7 +74,10 @@ fn math_symbol_shortcodes() -> Vec<(String, String)> {
             })
         })
         .filter(|(_shortcode, symbol)| whitelist.contains(symbol))
-        .collect()
+        .collect();
+
+    println!("Found {} math symbols", output.len());
+    output
 }
 
 fn github_emoji_shortcodes() -> Vec<(String, String)> {
@@ -85,7 +89,8 @@ fn github_emoji_shortcodes() -> Vec<(String, String)> {
 
     //have to filter out bad URLs like
     // "https://github.githubassets.com/images/icons/emoji/bowtie.png?v8"
-    json.iter()
+    let output: Vec<(String, String)> = json
+        .iter()
         .filter_map(|(key, url)| {
             let key_chars: Vec<char> = key.chars().collect();
             if key_chars.first().map(|c| c == &'u').unwrap_or(false)
@@ -101,7 +106,31 @@ fn github_emoji_shortcodes() -> Vec<(String, String)> {
                     .ok()
             }
         })
-        .collect::<Vec<(String, String)>>()
+        .collect::<Vec<(String, String)>>();
+    println!("Found {} github emoji shortcodes", output.len());
+    output
+}
+
+fn custom_shortcodes() -> Vec<(String, String)> {
+    //Read shortcode, sysmbol from custom_shortcodes.tsv
+    let reader = io::BufReader::new(
+        File::open("custom_shortcodes.tsv").expect("Failed to open custom_shortcodes.tsv"),
+    );
+    let mut rdr = csv::ReaderBuilder::new()
+        .delimiter(b'\t')
+        .has_headers(false)
+        .from_reader(reader);
+
+    let output: Vec<(String, String)> = rdr
+        .records()
+        .map(|result| {
+            let record = result.expect("Failed to parse a record in custom_shortcodes.tsv");
+            (record[0].to_string(), record[1].to_string())
+        })
+        .collect();
+
+    println!("Found {} custom shortcodes", output.len());
+    output
 }
 
 fn write_symbols_and_shortcodes(
@@ -213,18 +242,39 @@ fn process_dictionary() -> Result<(), Box<dyn error::Error>> {
 }
 
 fn main() -> Result<(), Box<dyn error::Error>> {
-    println!("Fetching math symbols");
-    let math_symbols = math_symbol_shortcodes();
+    let args: HashSet<String> = env::args().collect();
 
-    println!("Fetching shortcodes from github");
-    let shortcodes = github_emoji_shortcodes();
+    if args.contains("symbols") {
+        println!("-- Processing symbols and shortcodes --");
+        println!("Fetching math symbols");
+        let math_shortcodes = math_symbol_shortcodes();
 
-    let all_symbols = [math_symbols, shortcodes].concat();
+        println!("Fetching shortcodes from github");
+        let github_shortcodes = github_emoji_shortcodes();
 
-    println!("Writing symbols and shortcodes to files");
-    write_symbols_and_shortcodes(all_symbols)?;
-    println!("Processing dictionary");
-    process_dictionary()?;
+        let custom_shortcodes = custom_shortcodes();
+        let all_symbols = [math_shortcodes, github_shortcodes, custom_shortcodes].concat();
+
+        let shortcode_set = all_symbols
+            .iter()
+            .map(|(shortcode, _)| shortcode)
+            .collect::<HashSet<&String>>();
+
+        if shortcode_set.len() != all_symbols.len() {
+            return Err("Shortcode collision detected".into());
+        } else {
+            println!("No shortcode collisions detected");
+        }
+
+        println!("Writing symbols and shortcodes to files");
+        write_symbols_and_shortcodes(all_symbols)?;
+        println!("-- Done processing symbols and shortcodes --");
+    }
+    if args.contains("dictionary") {
+        println!("-- Processing dictionary --");
+        process_dictionary()?;
+        println!("-- Done processing dictionary --");
+    }
 
     Ok(())
 }

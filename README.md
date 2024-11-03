@@ -52,7 +52,8 @@ wget https://norvig.com/ngrams/count_1w.txt
 Finally, run the preprocessing script
 ```shell
 cd src/predict
-cargo run --package preproc --bin preproc
+# Can also pass just one of "symbols" or "dictionary" to regenerate only that portion
+cargo run --package preproc --bin preproc symbols dictionary
 ```
 
 This will generate `dictionary.fst`, `shortcodes.fst` and `symbols.bin`.

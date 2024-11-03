@@ -1,3 +1,12 @@
+# Hunspell and wordfreq data
+en_US.aff
+en_US.dic
+hunspell*
+README_en_US.txt
+
+count_1w.txt
+
+
 *.m4
 *.in
 /config.*
@@ -7,9 +16,6 @@ autom4te.cache/
 stamp-*
 *.xml
 .cmake
-
-hunspell_US.txt
-count_1w.txt
 
 CMakeFiles/
 *.cbp
